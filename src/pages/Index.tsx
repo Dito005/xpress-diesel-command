@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, DollarSign, Users, Wrench, MapPin, Plus, Bot, Package, FileText, Calculator, Settings, Database, Brain, Workflow, AlertTriangle, BarChart, Search, LogOut } from "lucide-react";
 import { JobBoard } from "@/components/JobBoard";
@@ -45,6 +46,7 @@ const Index = () => {
   });
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isAiHelperOpen, setIsAiHelperOpen] = useState(false);
 
   useEffect(() => {
     if (!session) return;
@@ -145,7 +147,6 @@ const Index = () => {
     { value: "invoicing", label: "Invoicing", icon: Calculator, roles: ["admin", "manager", "unassigned"] },
     { value: "reports", label: "Reports", icon: FileText, roles: ["admin", "manager", "unassigned"] },
     { value: "parts-lookup", label: "Parts Lookup", icon: Search, roles: ["admin", "manager", "parts", "mechanic", "unassigned"] },
-    { value: "ai-helper", label: "AI Helper", icon: Bot, roles: ["admin", "manager", "mechanic", "road", "parts", "unassigned"] },
     { value: "costs", label: "Costs", icon: Database, roles: ["admin", "manager", "unassigned"] },
     { value: "settings", label: "Settings", icon: Settings, roles: ["admin", "unassigned"] },
   ];
@@ -169,8 +170,7 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="text-center">
-              <h1 className="text-xl font-bold text-gray-900">Xpress Diesel Repair</h1>
-              <p className="text-sm font-medium text-blue-600 -mt-1">Command Center</p>
+              <h1 className="text-xl font-bold text-gray-900">Xpress Repair Software</h1>
             </div>
             <div className="flex items-center space-x-4">
               {userRole && (
@@ -178,6 +178,16 @@ const Index = () => {
                   {getRoleLabel(userRole)}
                 </Badge>
               )}
+              <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <Bot className="h-5 w-5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0">
+                  <AIHelper />
+                </DialogContent>
+              </Dialog>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -263,7 +273,6 @@ const Index = () => {
           <TabsContent value="invoicing"><InvoicingSystem /></TabsContent>
           <TabsContent value="reports"><ReportsAnalytics /></TabsContent>
           <TabsContent value="parts-lookup"><PartsLookupTool /></TabsContent>
-          <TabsContent value="ai-helper"><AIHelper /></TabsContent>
           <TabsContent value="costs"><BusinessCosts /></TabsContent>
           <TabsContent value="settings">
             <Tabs defaultValue="shop" className="space-y-4">

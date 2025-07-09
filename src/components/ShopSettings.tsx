@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,11 +6,75 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Building, DollarSign, Clock, Save, Home } from "lucide-react";
+import { Settings, Building, DollarSign, Clock, Save, Home, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "./SessionProvider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const fetchSettings = async () => {
+  const { data, error } = await supabase.from('settings').select('key, value');
+  if (error) throw new Error(error.message);
+  return data.reduce((acc, setting) => {
+    acc[setting.key] = setting.value;
+    return acc;
+  }, {});
+};
 
 export const ShopSettings = () => {
   const { toast } = useToast();
+  const { userRole } = useSession();
+  const queryClient = useQueryClient();
+
+  const { data: settings, isLoading: isLoadingSettings } = useQuery({
+    queryKey: ['shopSettings'],
+    queryFn: fetchSettings,
+    enabled: userRole === 'admin',
+  });
+
+  const [aiSettings, setAiSettings] = useState({
+    ai_provider: '',
+    ai_api_key: '',
+    ai_model: '',
+    ai_enabled: false,
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setAiSettings({
+        ai_provider: settings.ai_provider || 'openai',
+        ai_api_key: settings.ai_api_key || '',
+        ai_model: settings.ai_model || 'gpt-4',
+        ai_enabled: settings.ai_enabled === 'true',
+      });
+    }
+  }, [settings]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (newSettings: { key: string; value: string }[]) => {
+      const { error } = await supabase.from('settings').upsert(newSettings, { onConflict: 'key' });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shopSettings'] });
+      toast({ title: "Settings Saved", description: "AI settings have been updated." });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  });
+
+  const handleAiSettingsSave = () => {
+    const settingsToSave = [
+      { key: 'ai_provider', value: aiSettings.ai_provider },
+      { key: 'ai_api_key', value: aiSettings.ai_api_key },
+      { key: 'ai_model', value: aiSettings.ai_model },
+      { key: 'ai_enabled', value: String(aiSettings.ai_enabled) },
+    ];
+    updateSettingsMutation.mutate(settingsToSave);
+  };
+
   const [shopConfig, setShopConfig] = useState({
     shopName: "Xpress Diesel Repair",
     address: "123 Truck Way, Industrial District",
@@ -87,12 +151,13 @@ export const ShopSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="pricing">Pricing</TabsTrigger>
           <TabsTrigger value="hours">Business Hours</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing</TabsTrigger>
           <TabsTrigger value="overhead">Overhead</TabsTrigger>
+          {userRole === 'admin' && <TabsTrigger value="ai">AI Assistant</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -325,6 +390,76 @@ export const ShopSettings = () => {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ai" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                AI Assistant Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingSettings ? <p>Loading AI settings...</p> : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Enable AI Assistant</Label>
+                      <p className="text-sm text-gray-600">Toggle the AI chatbot for all users.</p>
+                    </div>
+                    <Switch
+                      checked={aiSettings.ai_enabled}
+                      onCheckedChange={(checked) => setAiSettings(prev => ({ ...prev, ai_enabled: checked }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="aiProvider">AI Provider</Label>
+                      <Select
+                        value={aiSettings.ai_provider}
+                        onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_provider: value }))}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="gemini">Google Gemini</SelectItem>
+                          <SelectItem value="copilot">Microsoft Copilot</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="aiModel">AI Model</Label>
+                      <Select
+                        value={aiSettings.ai_model}
+                        onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_model: value }))}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                          <SelectItem value="gpt-4">GPT-4</SelectItem>
+                          <SelectItem value="gpt-3.5-turbo">GPT-3.5-Turbo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="apiKey">API Key</Label>
+                    <Input
+                      id="apiKey"
+                      type="password"
+                      placeholder="Enter your API key"
+                      value={aiSettings.ai_api_key}
+                      onChange={(e) => setAiSettings(prev => ({ ...prev, ai_api_key: e.target.value }))}
+                    />
+                  </div>
+                  <Button onClick={handleAiSettingsSave} disabled={updateSettingsMutation.isPending}>
+                    {updateSettingsMutation.isPending ? "Saving..." : "Save AI Settings"}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

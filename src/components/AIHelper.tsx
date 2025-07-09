@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
+import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bot, Send, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { Bot, Send, Loader2, User } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "./SessionProvider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,20 +26,31 @@ interface Message {
 }
 
 interface AIAction {
-  command: 'create_job' | 'generate_invoice' | 'clock_in_tech';
+  command: 'create_job_by_ai' | 'generate_invoice' | 'clock_in_tech';
   params: Record<string, any>;
   confirmationMessage: string;
 }
 
 export const AIHelper = () => {
   const { toast } = useToast();
+  const { session } = useSession();
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, type: "ai", content: "Hi! I'm your AI assistant. How can I help you manage the shop today? Try asking me to 'create a job' or 'generate an invoice for job 123'." }
+    { id: 1, type: "ai", content: "Hi! I'm your AI assistant. How can I help you manage the shop today? Try asking me to 'create a job'." }
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<AIAction | null>(null);
+  const [sessionId, setSessionId] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let storedSessionId = localStorage.getItem('ai_session_id');
+    if (!storedSessionId) {
+      storedSessionId = uuidv4();
+      localStorage.setItem('ai_session_id', storedSessionId);
+    }
+    setSessionId(storedSessionId);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,16 +59,22 @@ export const AIHelper = () => {
   useEffect(scrollToBottom, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !session?.user?.id) return;
 
     const userMessage: Message = { id: Date.now(), type: "user", content: inputMessage };
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputMessage;
     setInputMessage("");
     setIsLoading(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: { prompt: inputMessage, history: messages },
+        body: { 
+          prompt: currentInput, 
+          history: messages,
+          sessionId: sessionId,
+          userId: session.user.id,
+        },
       });
 
       if (error) throw error;
@@ -82,66 +101,36 @@ export const AIHelper = () => {
     if (!actionToConfirm) return;
 
     setIsLoading(true);
-    let success = false;
     let successMessage = "";
 
     try {
-      if (actionToConfirm.command === 'create_job') {
-        const { error } = await supabase.from('jobs').insert([
-          { 
-            customer_info: { name: actionToConfirm.params.customerName },
-            description: actionToConfirm.params.description,
-            status: 'pending',
-            truck_vin: actionToConfirm.params.truckVin,
-            job_type: actionToConfirm.params.jobType,
-            customer_name: actionToConfirm.params.customerName,
-            customer_email: actionToConfirm.params.customerEmail,
-            customer_phone: actionToConfirm.params.customerPhone,
-            notes: actionToConfirm.params.notes,
-          }
-        ]);
+      if (actionToConfirm.command === 'create_job_by_ai') {
+        const { data: newJobId, error } = await supabase.rpc('create_job_by_ai', actionToConfirm.params);
+        
         if (error) throw error;
-        success = true;
-        successMessage = `Job for ${actionToConfirm.params.customerName} has been created.`;
-      } else if (actionToConfirm.command === 'clock_in_tech') {
-        const { techId, jobId } = actionToConfirm.params;
-        if (!techId) throw new Error("Technician ID is required to clock in.");
 
-        // Check if tech is already clocked in for a shift or job
-        const { data: existingLogs, error: existingLogsError } = await supabase
-          .from('time_logs')
-          .select('*')
-          .eq('tech_id', techId)
-          .is('clock_out', null);
+        await supabase.from('ai_action_logs').insert({
+          user_id: session?.user?.id,
+          action_type: 'create_job_by_ai',
+          details: { ...actionToConfirm.params, new_job_id: newJobId },
+          status: 'success',
+        });
 
-        if (existingLogsError) throw existingLogsError;
-
-        // Clock out any existing active logs for this tech
-        for (const log of existingLogs) {
-          await supabase.from('time_logs').update({ clock_out: new Date().toISOString() }).eq('id', log.id);
-        }
-
-        // Clock in for the new shift/job
-        const { error } = await supabase.from('time_logs').insert([
-          { 
-            tech_id: techId, 
-            job_id: jobId || null, 
-            clock_in: new Date().toISOString(),
-            type: jobId ? 'job' : 'shift',
-            notes: jobId ? `Clocked in for job ${jobId}` : 'General shift clock-in',
-          }
-        ]);
-        if (error) throw error;
-        success = true;
-        const techName = (await supabase.from('techs').select('name').eq('id', techId).single()).data?.name || 'Technician';
-        successMessage = `${techName} has been clocked in ${jobId ? `for job ${jobId}` : 'for their shift'}.`;
+        successMessage = `Job for ${actionToConfirm.params._customer_name} has been created successfully (ID: ${newJobId.slice(0,8)}).`;
       }
       // Add other command handlers here...
 
-      if (success) {
-        toast({ title: "Action Successful", description: successMessage });
-      }
+      toast({ title: "Action Successful", description: successMessage });
+      setMessages(prev => [...prev, { id: Date.now(), type: 'ai', content: successMessage }]);
+
     } catch (error: any) {
+      await supabase.from('ai_action_logs').insert({
+        user_id: session?.user?.id,
+        action_type: actionToConfirm.command,
+        details: actionToConfirm.params,
+        status: 'failed',
+        error_message: error.message,
+      });
       toast({ variant: "destructive", title: "Action Failed", description: error.message });
     } finally {
       setActionToConfirm(null);
@@ -151,7 +140,7 @@ export const AIHelper = () => {
 
   return (
     <>
-      <Card className="h-[70vh] flex flex-col">
+      <Card className="h-full flex flex-col border-0 shadow-none rounded-none">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-6 w-6 text-blue-600" /> AI Assistant
@@ -162,13 +151,14 @@ export const AIHelper = () => {
             <div key={message.id} className={`flex items-end gap-2 ${message.type === "user" ? "justify-end" : "justify-start"}`}>
               {message.type === 'ai' && <Bot className="h-6 w-6 text-gray-500 flex-shrink-0" />}
               <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.type === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}`}>
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 {message.action && !isLoading && (
                   <Button size="sm" className="mt-2" onClick={() => setActionToConfirm(message.action!)}>
                     Confirm Action
                   </Button>
                 )}
               </div>
+              {message.type === 'user' && <User className="h-6 w-6 text-gray-500 flex-shrink-0" />}
             </div>
           ))}
           {isLoading && !actionToConfirm && (
@@ -179,10 +169,10 @@ export const AIHelper = () => {
           )}
           <div ref={messagesEndRef} />
         </CardContent>
-        <div className="p-4 border-t">
+        <div className="p-4 border-t bg-white">
           <div className="flex gap-2">
             <Input
-              placeholder="Ask me to create a job, generate an invoice, or clock in a tech..."
+              placeholder="Ask me to create a job, check a status..."
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
@@ -205,7 +195,7 @@ export const AIHelper = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setActionToConfirm(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmAction}>
+            <AlertDialogAction onClick={handleConfirmAction} disabled={isLoading}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
