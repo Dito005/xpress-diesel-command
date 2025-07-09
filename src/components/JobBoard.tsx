@@ -1,9 +1,10 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, DollarSign, User, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Clock, DollarSign, User, AlertTriangle, Plus } from "lucide-react";
+import { NewJobForm } from "./NewJobForm";
 
 export const JobBoard = ({ onJobClick }) => {
   const [jobs] = useState([
@@ -126,65 +127,84 @@ export const JobBoard = ({ onJobClick }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      {Object.entries(jobsByStatus).map(([status, statusJobs]) => (
-        <div key={status} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900 capitalize">
-              {getStatusText(status)}
-            </h3>
-            <Badge variant="outline" className="text-xs">
-              {statusJobs.length}
-            </Badge>
-          </div>
-          
-          <div className="space-y-3">
-            {statusJobs.map((job) => (
-              <Card 
-                key={job.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-blue-500"
-                onClick={() => onJobClick(job)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      {job.unitNumber}
-                      {getPriorityIcon(job.priority)}
-                    </CardTitle>
-                    <Badge className={getStatusColor(job.status)} variant="outline">
-                      {getStatusText(job.status)}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0 space-y-2">
-                  <div className="text-sm font-medium text-gray-900">{job.jobType}</div>
-                  <div className="text-xs text-gray-600">{job.customerName}</div>
-                  
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <User className="h-3 w-3" />
-                    {job.assignedTech}
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <Clock className="h-3 w-3" />
-                      {job.clockedHours}h / {job.estimatedHours}h
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Live Job Board</h2>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              New Job
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Create New Job</DialogTitle>
+            </DialogHeader>
+            <NewJobForm />
+          </DialogContent>
+        </Dialog>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {Object.entries(jobsByStatus).map(([status, statusJobs]) => (
+          <div key={status} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900 capitalize">
+                {getStatusText(status)}
+              </h3>
+              <Badge variant="outline" className="text-xs">
+                {statusJobs.length}
+              </Badge>
+            </div>
+            
+            <div className="space-y-3">
+              {statusJobs.map((job) => (
+                <Card 
+                  key={job.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-blue-500"
+                  onClick={() => onJobClick(job)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        {job.unitNumber}
+                        {getPriorityIcon(job.priority)}
+                      </CardTitle>
+                      <Badge className={getStatusColor(job.status)} variant="outline">
+                        {getStatusText(job.status)}
+                      </Badge>
                     </div>
-                    <div className={`flex items-center gap-1 font-medium ${getProfitColor(job.profitMargin)}`}>
-                      <DollarSign className="h-3 w-3" />
-                      {job.profitMargin}%
+                  </CardHeader>
+                  <CardContent className="pt-0 space-y-2">
+                    <div className="text-sm font-medium text-gray-900">{job.jobType}</div>
+                    <div className="text-xs text-gray-600">{job.customerName}</div>
+                    
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <User className="h-3 w-3" />
+                      {job.assignedTech}
                     </div>
-                  </div>
-                  
-                  <div className="text-xs text-gray-500 line-clamp-2">
-                    {job.complaint}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1 text-gray-600">
+                        <Clock className="h-3 w-3" />
+                        {job.clockedHours}h / {job.estimatedHours}h
+                      </div>
+                      <div className={`flex items-center gap-1 font-medium ${getProfitColor(job.profitMargin)}`}>
+                        <DollarSign className="h-3 w-3" />
+                        {job.profitMargin}%
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500 line-clamp-2">
+                      {job.complaint}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };
