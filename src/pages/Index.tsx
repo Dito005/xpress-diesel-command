@@ -13,8 +13,8 @@ import { ReportsAnalytics } from "@/components/ReportsAnalytics";
 import { AIHelper } from "@/components/AIHelper";
 import { InvoicingSystem } from "@/components/InvoicingSystem";
 import { ShopSettings } from "@/components/ShopSettings";
-import { TechnicianManagement } from "@/components/TechnicianManagement"; // Corrected import
-import { TechnicianList } from "@/components/TechnicianList"; // Added missing import
+import { TechnicianManagement } from "@/components/TechnicianManagement";
+import { TechnicianList } from "@/components/TechnicianList";
 import { BusinessCosts } from "@/components/BusinessCosts";
 import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
 import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
@@ -156,16 +156,11 @@ const Index = () => {
     if (!userRole) {
       return false;
     }
-    if (isUserRole(userRole)) {
-      // Manually check if any of the tab's roles match the user's role
-      for (const role of tab.roles) {
-        if (role === userRole) {
-          return true;
-        }
-      }
-      return false; // No matching role found
-    }
-    return false; // If userRole is a string but not a valid UserRole
+    // Capture the narrowed userRole in a local constant to ensure type propagation
+    const currentUserRole: UserRole = userRole; 
+    
+    // Now use currentUserRole in the comparison
+    return tab.roles.some(role => role === currentUserRole);
   });
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
 

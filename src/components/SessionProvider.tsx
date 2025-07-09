@@ -21,33 +21,30 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
     const handleAuthStateChange = async (event: string, currentSession: Session | null) => {
       setSession(currentSession);
       if (currentSession) {
+        console.log("Session found for user ID:", currentSession.user.id);
         // Fetch user role from public.techs table
-        const { data: techData, error: techError } = await supabase
+        const { data: techDataArray, error: techError } = await supabase
           .from('techs')
           .select('role')
           .eq('id', currentSession.user.id)
-          .single();
+          .limit(1); // Use limit(1) instead of single() for more robust handling of no-rows-found
 
         if (techError) {
-          // Log all errors, not just PGRST116, to help diagnose
           console.error("Error fetching user role from techs table:", techError);
-          if (techError.code === 'PGRST116') { // No rows found
-            setUserRole('unassigned');
-            console.warn(`User ${currentSession.user.id} has no tech profile. Assigning 'unassigned' role.`);
-          } else {
-            // For other errors, default to unassigned but log the specific error
-            setUserRole('unassigned');
-            console.error(`Failed to fetch role for user ${currentSession.user.id}:`, techError.message);
-          }
-        } else if (techData) {
-          setUserRole(techData.role);
+          console.error("Full techError object:", JSON.stringify(techError, null, 2));
+          setUserRole('unassigned'); // Fallback on any error
+          console.warn(`Failed to fetch role for user ${currentSession.user.id}. Assigning 'unassigned' role.`);
+        } else if (techDataArray && techDataArray.length > 0 && techDataArray[0].role) {
+          setUserRole(techDataArray[0].role);
+          console.log(`User ${currentSession.user.id} role set to: ${techDataArray[0].role}`);
         } else {
-          // Fallback if data is null but no explicit error (shouldn't happen with .single())
+          // This covers cases where data is empty array or role is null/undefined
           setUserRole('unassigned');
-          console.warn(`User ${currentSession.user.id} tech profile found but role is null or undefined. Assigning 'unassigned' role.`);
+          console.warn(`User ${currentSession.user.id} tech profile not found or role is missing. Assigning 'unassigned' role.`);
         }
       } else {
         setUserRole(null);
+        console.log("No active session. User role set to null.");
       }
       setIsLoading(false); // Always set isLoading to false after auth state is processed
     };
