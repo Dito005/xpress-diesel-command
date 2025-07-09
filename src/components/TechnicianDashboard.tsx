@@ -1,40 +1,161 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Play, Pause, CheckCircle, User, Wrench } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 export const TechnicianDashboard = ({ userRole, onJobClick }) => {
-  const [isWorking, setIsWorking] = useState(false);
-  const [currentJobTimer, setCurrentJobTimer] = useState(0);
+  const { toast } = useToast();
+  const [technicianJobs, setTechnicianJobs] = useState([]);
+  const [currentShiftLog, setCurrentShiftLog] = useState(null);
+  const [currentJobLog, setCurrentJobLog] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  const technicianJobs = [
-    {
-      id: 1,
-      unitNumber: "T-2041",
-      jobType: "PM Service", 
-      status: "assigned",
-      estimatedHours: 4,
-      customerName: "ABC Transport",
-      complaint: "Scheduled 10,000 mile service",
-      priority: "medium"
-    },
-    {
-      id: 2,
-      unitNumber: "T-1507", 
-      jobType: "AC Repair",
-      status: "in_progress",
-      estimatedHours: 3,
-      clockedHours: 2.5,
-      customerName: "XYZ Logistics", 
-      complaint: "AC not cooling, possible compressor issue",
-      priority: "high"
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        fetchTechnicianData(user.id);
+      }
+    };
+    fetchUserData();
+
+    const channel = supabase
+      .channel('technician_dashboard_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, payload => {
+        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+          fetchTechnicianData(currentUserId);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, payload => {
+        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+          fetchTechnicianData(currentUserId);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
+  const fetchTechnicianData = async (userId) => {
+    if (!userId) return;
+
+    // Fetch assigned jobs
+    const { data: jobsData, error: jobsError } = await supabase
+      .from('jobs')
+      .select(`
+        *,
+        assigned_tech:users(name)
+      `)
+      .eq('assigned_mechanic', userId)
+      .in('status', ['pending', 'in_progress']);
+
+    if (jobsError) {
+      console.error("Error fetching technician jobs:", jobsError);
+    } else {
+      setTechnicianJobs(jobsData);
     }
-  ];
 
-  const handleClockInOut = () => {
-    setIsWorking(!isWorking);
+    // Fetch current shift log
+    const { data: shiftLog, error: shiftError } = await supabase
+      .from('time_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .is('clock_out', null)
+      .eq('job_id', null) // General shift
+      .single();
+
+    if (shiftError && shiftError.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error("Error fetching current shift log:", shiftError);
+    } else {
+      setCurrentShiftLog(shiftLog);
+    }
+
+    // Fetch current job log
+    const { data: jobLog, error: jobLogError } = await supabase
+      .from('time_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .is('clock_out', null)
+      .not('job_id', 'is', null) // Specific job
+      .single();
+
+    if (jobLogError && jobLogError.code !== 'PGRST116') {
+      console.error("Error fetching current job log:", jobLogError);
+    } else {
+      setCurrentJobLog(jobLog);
+    }
+  };
+
+  const handleClockInOutShift = async () => {
+    if (currentShiftLog) {
+      // Clock out
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ clock_out: new Date().toISOString() })
+        .eq('id', currentShiftLog.id);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to clock out." });
+      } else {
+        toast({ title: "Clocked Out", description: "You have clocked out of your shift." });
+        setCurrentShiftLog(null);
+      }
+    } else {
+      // Clock in
+      const { error } = await supabase
+        .from('time_logs')
+        .insert({ user_id: currentUserId, clock_in: new Date().toISOString(), notes: 'General Shift' });
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to clock in." });
+      } else {
+        toast({ title: "Clocked In", description: "You have clocked in for your shift." });
+        fetchTechnicianData(currentUserId); // Re-fetch to get the new log
+      }
+    }
+  };
+
+  const handleClockInOutJob = async (jobId: string) => {
+    if (currentJobLog && currentJobLog.job_id === jobId) {
+      // Clock out of current job
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ clock_out: new Date().toISOString() })
+        .eq('id', currentJobLog.id);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to clock out of job." });
+      } else {
+        toast({ title: "Job Clocked Out", description: "You have clocked out of the job." });
+        setCurrentJobLog(null);
+        fetchTechnicianData(currentUserId);
+      }
+    } else {
+      // Clock in to new job (and clock out of any other job if active)
+      if (currentJobLog) {
+        await supabase
+          .from('time_logs')
+          .update({ clock_out: new Date().toISOString() })
+          .eq('id', currentJobLog.id);
+      }
+
+      const { error } = await supabase
+        .from('time_logs')
+        .insert({ user_id: currentUserId, job_id: jobId, clock_in: new Date().toISOString() });
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
+      } else {
+        toast({ title: "Job Clocked In", description: "You have clocked in to the job." });
+        fetchTechnicianData(currentUserId);
+      }
+    }
   };
 
   const getStatusColor = (status) => {
@@ -57,21 +178,21 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-lg font-semibold">
-                  {isWorking ? "Clocked In" : "Clocked Out"}
+                  {currentShiftLog ? "Clocked In" : "Clocked Out"}
                 </div>
                 <Button 
-                  onClick={handleClockInOut}
-                  variant={isWorking ? "destructive" : "default"}
+                  onClick={handleClockInOutShift}
+                  variant={currentShiftLog ? "destructive" : "default"}
                   size="sm"
-                  className={isWorking ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}
+                  className={currentShiftLog ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}
                 >
-                  {isWorking ? <Pause className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
-                  {isWorking ? "Clock Out" : "Clock In"}
+                  {currentShiftLog ? <Pause className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
+                  {currentShiftLog ? "Clock Out" : "Clock In"}
                 </Button>
               </div>
-              {isWorking && (
+              {currentShiftLog && (
                 <div className="text-xs text-slate-300 mt-2">
-                  Shift started at 7:30 AM
+                  Shift started at {new Date(currentShiftLog.clock_in).toLocaleTimeString()}
                 </div>
               )}
             </CardContent>
@@ -85,8 +206,8 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">6.5</div>
-              <div className="text-xs text-gray-500">Efficiency: 92%</div>
+              <div className="text-2xl font-bold text-gray-900">N/A</div> {/* Will be calculated from time_logs */}
+              <div className="text-xs text-gray-500">Efficiency: N/A</div>
             </CardContent>
           </Card>
 
@@ -98,8 +219,8 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">3</div>
-              <div className="text-xs text-gray-500">2 Completed</div>
+              <div className="text-2xl font-bold text-gray-900">N/A</div> {/* Will be calculated from time_logs */}
+              <div className="text-xs text-gray-500">N/A Completed</div>
             </CardContent>
           </Card>
         </div>
@@ -128,7 +249,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-gray-900">
-                    {job.unitNumber}
+                    {job.vehicle_info.vin.slice(-6)} - {job.job_type}
                   </CardTitle>
                   <Badge className={getStatusColor(job.status)} variant="outline">
                     {job.status === "assigned" ? "Assigned" : 
@@ -138,19 +259,15 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <div className="font-medium text-gray-900">{job.jobType}</div>
-                  <div className="text-sm text-gray-600">{job.customerName}</div>
+                  <div className="font-medium text-gray-900">{job.description}</div>
+                  <div className="text-sm text-gray-600">{job.customer_info.name}</div>
                 </div>
                 
-                <div className="text-sm text-gray-700">
-                  {job.complaint}
-                </div>
-
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Clock className="h-4 w-4" />
-                    Est. {job.estimatedHours}h
-                    {job.clockedHours && ` • Worked: ${job.clockedHours}h`}
+                    Est. {job.estimated_hours}h
+                    {job.actual_hours && ` • Worked: ${job.actual_hours}h`}
                   </div>
                   {job.priority === "high" && (
                     <Badge variant="destructive" className="text-xs">High Priority</Badge>
@@ -164,11 +281,21 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
                       className="flex-1 bg-blue-600 hover:bg-blue-700"
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log(`Starting job ${job.id}`);
+                        handleClockInOutJob(job.id);
                       }}
+                      disabled={currentJobLog && currentJobLog.job_id !== job.id}
                     >
-                      <Play className="h-4 w-4 mr-1" />
-                      Start Work
+                      {currentJobLog && currentJobLog.job_id === job.id ? (
+                        <>
+                          <Pause className="h-4 w-4 mr-1" />
+                          Clock Out Job
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-1" />
+                          Clock In Job
+                        </>
+                      )}
                     </Button>
                     <Button 
                       variant="outline" 

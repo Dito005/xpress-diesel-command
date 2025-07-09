@@ -1,61 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin } from "lucide-react";
+import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TechnicianForm, Technician } from "./TechnicianForm";
+import { supabase } from "@/lib/supabase";
 
 export const TechnicianManagement = () => {
   const { toast } = useToast();
-  const [technicians, setTechnicians] = useState<Technician[]>([
-    {
-      id: "tech-001",
-      name: "Mike Rodriguez",
-      role: "lead",
-      specialties: ["Engine Repair", "Transmission", "Electrical"],
-      hourlyRate: 35,
-      phone: "(555) 123-4567",
-      email: "mike@xpressdiesel.com",
-      active: true,
-      certifications: ["ASE Master", "Cummins Certified"],
-      experience: 15,
-      efficiency: 92,
-      location: "both"
-    },
-    {
-      id: "tech-002",
-      name: "Sarah Johnson",
-      role: "senior",
-      specialties: ["Brake Systems", "AC/Heating", "PM Service"],
-      hourlyRate: 28,
-      phone: "(555) 234-5678",
-      email: "sarah@xpressdiesel.com",
-      active: true,
-      certifications: ["ASE Brakes", "EPA 609"],
-      experience: 8,
-      efficiency: 88,
-      location: "shop"
-    },
-    {
-      id: "tech-003",
-      name: "Carlos Martinez",
-      role: "junior",
-      specialties: ["PM Service", "Basic Repairs"],
-      hourlyRate: 22,
-      phone: "(555) 345-6789",
-      email: "carlos@xpressdiesel.com",
-      active: true,
-      certifications: ["ASE Entry Level"],
-      experience: 3,
-      efficiency: 75,
-      location: "road"
-    }
-  ]);
-
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+
+  useEffect(() => {
+    fetchTechnicians();
+    const channel = supabase
+      .channel('technicians_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchTechnicians)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchTechnicians = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'mechanic'); // Only fetch users with 'mechanic' role for this view
+
+    if (error) {
+      console.error("Error fetching technicians:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load technicians.",
+      });
+    } else {
+      setTechnicians(data as Technician[]);
+    }
+  };
 
   const getRoleBadgeColor = (role: string) => {
     switch(role) {
@@ -73,23 +60,74 @@ export const TechnicianManagement = () => {
     return 'text-red-600';
   };
 
-  const handleSaveTechnician = (tech: Technician) => {
+  const handleSaveTechnician = async (tech: Technician) => {
     if (tech.id) {
-      setTechnicians(prev => prev.map(t => t.id === tech.id ? tech : t));
-      toast({
-        title: "Technician Updated",
-        description: `${tech.name}'s profile has been updated successfully.`,
-      });
+      // Update existing technician
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: tech.name,
+          role: tech.role,
+          hourly_rate: tech.hourlyRate,
+          phone: tech.phone,
+          email: tech.email,
+          active: tech.active,
+          experience: tech.experience,
+          efficiency: tech.efficiency,
+          location: tech.location,
+          // specialties and certifications would need separate tables or JSONB updates
+        })
+        .eq('id', tech.id);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error updating technician", description: error.message });
+      } else {
+        toast({ title: "Technician Updated", description: `${tech.name}'s profile has been updated successfully.` });
+        fetchTechnicians(); // Re-fetch to ensure UI is up-to-date
+      }
     } else {
-      const newTech = { ...tech, id: `tech-${Date.now()}` };
-      setTechnicians(prev => [...prev, newTech]);
-      toast({
-        title: "Technician Added",
-        description: `${tech.name} has been added to the team.`,
-      });
+      // Add new technician (this would typically be done via auth.admin.inviteUserByEmail)
+      // For this demo, we'll simulate adding to the 'users' table directly for simplicity
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          name: tech.name,
+          role: tech.role,
+          hourly_rate: tech.hourlyRate,
+          phone: tech.phone,
+          email: tech.email,
+          active: tech.active,
+          experience: tech.experience,
+          efficiency: tech.efficiency,
+          location: tech.location,
+          // specialties and certifications
+        });
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error adding technician", description: error.message });
+      } else {
+        toast({ title: "Technician Added", description: `${tech.name} has been added to the team.` });
+        fetchTechnicians();
+      }
     }
     setSelectedTech(null);
     setShowAddDialog(false);
+  };
+
+  const handleDeleteTechnician = async (techId: string, techName: string) => {
+    if (window.confirm(`Are you sure you want to delete ${techName}? This action cannot be undone.`)) {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', techId);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error deleting technician", description: error.message });
+      } else {
+        toast({ title: "Technician Deleted", description: `${techName} has been removed.` });
+        fetchTechnicians();
+      }
+    }
   };
 
   return (
@@ -150,7 +188,7 @@ export const TechnicianManagement = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Avg Efficiency</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {Math.round(technicians.reduce((sum, t) => sum + t.efficiency, 0) / technicians.length)}%
+                  {technicians.length > 0 ? Math.round(technicians.reduce((sum, t) => sum + t.efficiency, 0) / technicians.length) : 0}%
                 </p>
               </div>
               <Clock className="h-8 w-8 text-yellow-600" />
@@ -223,25 +261,30 @@ export const TechnicianManagement = () => {
                   </div>
                 </div>
                 
-                <Dialog open={selectedTech?.id === tech.id} onOpenChange={(isOpen) => !isOpen && setSelectedTech(null)}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={() => setSelectedTech(tech)}>
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Edit Technician</DialogTitle>
-                    </DialogHeader>
-                    {selectedTech && (
-                      <TechnicianForm
-                        technician={selectedTech}
-                        onSave={handleSaveTechnician}
-                        onCancel={() => setSelectedTech(null)}
-                      />
-                    )}
-                  </DialogContent>
-                </Dialog>
+                <div className="flex gap-2">
+                  <Dialog open={selectedTech?.id === tech.id} onOpenChange={(isOpen) => !isOpen && setSelectedTech(null)}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => setSelectedTech(tech)}>
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Edit Technician</DialogTitle>
+                      </DialogHeader>
+                      {selectedTech && (
+                        <TechnicianForm
+                          technician={selectedTech}
+                          onSave={handleSaveTechnician}
+                          onCancel={() => setSelectedTech(null)}
+                        />
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  <Button variant="destructive" size="sm" onClick={() => handleDeleteTechnician(tech.id, tech.name)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

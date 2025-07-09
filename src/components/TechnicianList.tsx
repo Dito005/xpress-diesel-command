@@ -1,25 +1,67 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users, Activity, MapPin, Edit } from "lucide-react";
 import { TechnicianTimeLogModal } from "./TechnicianTimeLogModal";
+import { supabase } from "@/lib/supabase";
 
-// This would typically come from your database/API
-const initialTechnicians = [
-  { id: "tech-001", name: "Mike Rodriguez", role: "lead", currentActivity: "Engine overhaul", location: "shop", status: "active" },
-  { id: "tech-002", name: "Sarah Johnson", role: "senior", currentActivity: "Brake inspection", location: "shop", status: "active" },
-  { id: "tech-003", name: "Carlos Martinez", role: "junior", currentActivity: "On route", location: "road", status: "active" },
-  { id: "tech-004", name: "Jessica Chen", role: "senior", currentActivity: "On break", location: "shop", status: "break" },
-];
+interface Technician {
+  id: string;
+  name: string;
+  role: string;
+  current_activity: string; // Renamed to match potential DB column
+  location: string;
+  status: 'active' | 'break' | 'offline';
+  hourly_rate: number; // Added for time log calculations
+  email: string;
+  phone: string;
+  efficiency: number;
+  experience: number;
+  active: boolean;
+  certifications: string[];
+  specialties: string[];
+}
 
 export const TechnicianList = () => {
-  const [technicians] = useState(initialTechnicians);
-  const [selectedTech, setSelectedTech] = useState(null);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [selectedTech, setSelectedTech] = useState<Technician | null>(null);
   const [isTimeLogModalOpen, setIsTimeLogModalOpen] = useState(false);
 
-  const handleTechClick = (tech: any) => {
+  useEffect(() => {
+    fetchTechnicians();
+    const channel = supabase
+      .channel('technician_list_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchTechnicians)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchTechnicians = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'mechanic'); // Fetch only mechanics
+
+    if (error) {
+      console.error("Error fetching technicians:", error);
+    } else {
+      // Add mock current_activity and status for display purposes if not in DB
+      const enrichedData = data.map(tech => ({
+        ...tech,
+        current_activity: tech.current_activity || "Idle", // Assuming current_activity might be a DB column
+        status: tech.status || (tech.active ? 'active' : 'offline'), // Assuming status might be a DB column
+        hourly_rate: tech.hourly_rate || 0, // Ensure hourly_rate exists
+      }));
+      setTechnicians(enrichedData as Technician[]);
+    }
+  };
+
+  const handleTechClick = (tech: Technician) => {
     setSelectedTech(tech);
     setIsTimeLogModalOpen(true);
   };
@@ -33,6 +75,7 @@ export const TechnicianList = () => {
   const getStatusColor = (status: string) => ({
     active: 'bg-green-400',
     break: 'bg-yellow-400',
+    offline: 'bg-red-400',
   }[status] || 'bg-gray-400');
 
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -60,7 +103,7 @@ export const TechnicianList = () => {
                       <Badge className={getRoleBadgeColor(tech.role)} variant="secondary">{tech.role}</Badge>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span className="flex items-center gap-1"><Activity className="h-3 w-3" />{tech.currentActivity}</span>
+                      <span className="flex items-center gap-1"><Activity className="h-3 w-3" />{tech.current_activity}</span>
                       <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{tech.location}</span>
                     </div>
                   </div>

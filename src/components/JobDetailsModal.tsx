@@ -1,15 +1,43 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Clock, DollarSign, User, Truck, FileText, Camera, Save } from "lucide-react";
+import { Clock, DollarSign, User, Truck, FileText, Camera, Save, Play, Pause } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 export const JobDetailsModal = ({ job, onClose, userRole }) => {
-  const [notes, setNotes] = useState("");
+  const { toast } = useToast();
+  const [notes, setNotes] = useState(job?.notes || "");
   const [jobStatus, setJobStatus] = useState(job?.status || "not_started");
+  const [currentJobTimeLog, setCurrentJobTimeLog] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  useEffect(() => {
+    const fetchUserAndLog = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        if (job?.id) {
+          const { data: log, error } = await supabase
+            .from('time_logs')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('job_id', job.id)
+            .is('clock_out', null)
+            .single();
+          if (error && error.code !== 'PGRST116') {
+            console.error("Error fetching current job time log:", error);
+          } else {
+            setCurrentJobTimeLog(log);
+          }
+        }
+      }
+    };
+    fetchUserAndLog();
+  }, [job?.id]);
 
   if (!job) return null;
 
@@ -30,18 +58,56 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
     return "text-red-600";
   };
 
+  const handleClockInOutJob = async () => {
+    if (!currentUserId || !job?.id) return;
+
+    if (currentJobTimeLog) {
+      // Clock out
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ clock_out: new Date().toISOString() })
+        .eq('id', currentJobTimeLog.id);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to clock out of job." });
+      } else {
+        toast({ title: "Job Clocked Out", description: "You have clocked out of this job." });
+        setCurrentJobTimeLog(null);
+        // Optionally update job status to 'paused' or similar
+      }
+    } else {
+      // Clock in
+      const { error } = await supabase
+        .from('time_logs')
+        .insert({ user_id: currentUserId, job_id: job.id, clock_in: new Date().toISOString() });
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
+      } else {
+        toast({ title: "Job Clocked In", description: "You have clocked in to this job." });
+        // Re-fetch to get the new log entry
+        const { data: newLog } = await supabase
+          .from('time_logs')
+          .select('*')
+          .eq('user_id', currentUserId)
+          .eq('job_id', job.id)
+          .is('clock_out', null)
+          .single();
+        setCurrentJobTimeLog(newLog);
+        // Optionally update job status to 'in_progress'
+      }
+    }
+  };
+
   return (
     <Dialog open={!!job} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Truck className="h-6 w-6 text-blue-600" />
-            Job Details - {job.unitNumber}
+            Job Details - {job.vehicle_info.vin.slice(-6)}
             <Badge className={getStatusColor(job.status)} variant="outline">
-              {job.status === "not_started" ? "Not Started" :
-               job.status === "in_progress" ? "In Progress" :
-               job.status === "waiting_parts" ? "Waiting Parts" :
-               job.status === "waiting_approval" ? "Waiting Approval" : "Completed"}
+              {job.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </Badge>
           </DialogTitle>
         </DialogHeader>
@@ -60,28 +126,28 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600">Unit Number</label>
-                    <div className="font-semibold">{job.unitNumber}</div>
+                    <div className="font-semibold">{job.vehicle_info.vin.slice(-6)}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Job Type</label>
-                    <div className="font-semibold">{job.jobType}</div>
+                    <div className="font-semibold">{job.description}</div> {/* Using description as job type for now */}
                   </div>
                 </div>
                 
                 <div>
                   <label className="text-sm font-medium text-gray-600">Customer</label>
-                  <div className="font-semibold">{job.customerName}</div>
+                  <div className="font-semibold">{job.customer_info.name}</div>
                 </div>
                 
                 <div>
                   <label className="text-sm font-medium text-gray-600">Complaint</label>
-                  <div className="text-gray-900">{job.complaint}</div>
+                  <div className="text-gray-900">{job.description}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">Assigned to:</span>
-                  <span className="font-medium">{job.assignedTech}</span>
+                  <span className="font-medium">{job.assigned_tech?.name || 'Unassigned'}</span>
                 </div>
               </CardContent>
             </Card>
@@ -97,11 +163,11 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600">Estimated Hours</label>
-                    <div className="text-xl font-bold text-blue-600">{job.estimatedHours}h</div>
+                    <div className="text-xl font-bold text-blue-600">{job.estimated_hours || 0}h</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Clocked Hours</label>
-                    <div className="text-xl font-bold text-green-600">{job.clockedHours || 0}h</div>
+                    <div className="text-xl font-bold text-green-600">{job.actual_hours || 0}h</div>
                   </div>
                 </div>
                 
@@ -110,11 +176,11 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${Math.min(((job.clockedHours || 0) / job.estimatedHours) * 100, 100)}%` }}
+                      style={{ width: `${Math.min(((job.actual_hours || 0) / (job.estimated_hours || 1)) * 100, 100)}%` }}
                     ></div>
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {Math.round(((job.clockedHours || 0) / job.estimatedHours) * 100)}% Complete
+                    {Math.round(((job.actual_hours || 0) / (job.estimated_hours || 1)) * 100)}% Complete
                   </div>
                 </div>
               </CardContent>
@@ -193,8 +259,21 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                   <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                    Start Job Timer
+                  <Button 
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={handleClockInOutJob}
+                  >
+                    {currentJobTimeLog ? (
+                      <>
+                        <Pause className="h-4 w-4 mr-1" />
+                        Clock Out Job
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-1" />
+                        Clock In Job
+                      </>
+                    )}
                   </Button>
                   <Button variant="outline" className="w-full">
                     Request Parts
