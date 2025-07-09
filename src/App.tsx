@@ -14,8 +14,16 @@ const queryClient = new QueryClient();
 const AppRoutes = () => {
   const { session, isLoading } = useSession();
 
+  // If not loading and no session, immediately navigate to login
+  if (!isLoading && !session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // While loading, or if session exists, render the routes
+  // The "Loading authentication..." message is now handled by not rendering anything
+  // until the session is determined, then immediately redirecting or showing content.
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading authentication...</div>;
+    return null; // Or a very minimal, quick loading indicator if absolutely necessary
   }
 
   return (
@@ -25,7 +33,8 @@ const AppRoutes = () => {
         // If session exists, allow access to dashboard and other private routes
         <Route path="/" element={<Index />} />
       ) : (
-        // If no session, redirect any attempt to access '/' to login
+        // This case should ideally be caught by the initial !isLoading && !session check
+        // but kept as a fallback.
         <Route path="/" element={<Navigate to="/login" replace />} />
       )}
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
@@ -41,7 +50,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionProvider>
-          <AppRoutes /> {/* Use the new AppRoutes component */}
+          <AppRoutes />
         </SessionProvider>
       </BrowserRouter>
     </TooltipProvider>

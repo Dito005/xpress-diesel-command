@@ -29,20 +29,20 @@ const fetchVehicleDataFromVIN = async (vin: string) => {
   return data;
 };
 
-// Simulated USDOT lookup for demonstration
-const fetchCompanyDataFromUSDOT = async (usdot: string) => {
-  console.log(`Simulating USDOT lookup for: ${usdot}`);
-  await new Promise(res => setTimeout(res, 1000)); // Simulate network delay
-  if (usdot === "1234567") {
-    return {
-      companyName: "Acme Trucking Inc.",
-      companyPhone: "(800) 555-1234",
-      companyAddress: "456 Trucker Blvd, Big City, TX 75001",
-      mcNumber: "MC-987654",
-    };
-  } else {
-    throw new Error("USDOT number not found or invalid.");
-  }
+// AI-powered suggestions for customer complaints based on job type
+const getSuggestedCustomerComplaint = (jobType: string): string => {
+  const suggestions: Record<string, string> = {
+    "PM Service": "Routine preventive maintenance service required.",
+    "Brake Repair": "Brakes are squealing/grinding, or pedal feels soft/spongy.",
+    "Engine Work": "Engine light is on, rough idling, or loss of power.",
+    "AC Repair": "Air conditioning is not blowing cold air or making unusual noises.",
+    "Transmission": "Transmission is slipping, shifting hard, or or leaking fluid.",
+    "Electrical": "Lights are flickering, battery draining, or electrical components not working.",
+    "Road Service": "Vehicle broke down on the side of the road, needs immediate assistance.",
+    "Diagnostic": "Check engine light is on, need to diagnose underlying issue.",
+    "Other": "General repair or maintenance needed, details to be provided."
+  };
+  return suggestions[jobType] || "";
 };
 
 const formSchema = z.object({
@@ -53,8 +53,8 @@ const formSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
   customerEmail: z.string().email("Invalid email address").optional().or(z.literal('')),
   customerPhone: z.string().min(1, "Customer phone is required"),
-  usdotNumber: z.string().optional(), // New USDOT field
-  company: z.string().optional(), // Company name from USDOT or manual
+  usdotNumber: z.string().optional(),
+  company: z.string().optional(),
   jobType: z.string().min(1, "Job type is required"),
   customerConcern: z.string().min(10, "Please provide a detailed customer concern"),
   recommendedService: z.string().optional(),
@@ -62,12 +62,21 @@ const formSchema = z.object({
   assignedTechId: z.string().optional(),
 });
 
+interface CustomerOption {
+  customerName: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  company?: string;
+  usdotNumber?: string;
+}
+
 export const NewJobForm = () => {
   const { toast } = useToast();
   const [isVinLoading, setIsVinLoading] = useState(false);
   const [isUsdotLoading, setIsUsdotLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [techs, setTechs] = useState([]);
+  const [existingCustomers, setExistingCustomers] = useState<CustomerOption[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -90,17 +99,42 @@ export const NewJobForm = () => {
   });
 
   useEffect(() => {
-    const fetchTechs = async () => {
-      const { data, error } = await supabase
+    const fetchInitialData = async () => {
+      // Fetch technicians
+      const { data: techsData, error: techsError } = await supabase
         .from('techs')
         .select('id, name');
-      if (error) {
-        console.error("Error fetching technicians:", error);
+      if (techsError) {
+        console.error("Error fetching technicians:", techsError);
       } else {
-        setTechs(data);
+        setTechs(techsData);
+      }
+
+      // Fetch existing customers
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select('customer_name, customer_email, customer_phone, company, customer_info')
+        .order('created_at', { ascending: false });
+
+      if (jobsError) {
+        console.error("Error fetching existing jobs for customers:", jobsError);
+      } else {
+        const uniqueCustomers = new Map<string, CustomerOption>();
+        jobsData.forEach(job => {
+          if (job.customer_name && !uniqueCustomers.has(job.customer_name)) {
+            uniqueCustomers.set(job.customer_name, {
+              customerName: job.customer_name,
+              customerEmail: job.customer_email || undefined,
+              customerPhone: job.customer_phone || undefined,
+              company: job.company || undefined,
+              usdotNumber: job.customer_info?.usdot_number || undefined,
+            });
+          }
+        });
+        setExistingCustomers(Array.from(uniqueCustomers.values()));
       }
     };
-    fetchTechs();
+    fetchInitialData();
   }, []);
 
   const handleVinLookup = async () => {
@@ -151,11 +185,21 @@ export const NewJobForm = () => {
 
     setIsUsdotLoading(true);
     try {
-      const data = await fetchCompanyDataFromUSDOT(usdot);
+      const { data, error } = await supabase.functions.invoke('usdot-lookup', {
+        body: { usdot },
+      });
+
+      if (error) {
+        if (error instanceof FunctionsHttpError) {
+          const errorMessage = await error.context.json();
+          throw new Error(errorMessage.error || 'An unknown error occurred during USDOT lookup.');
+        }
+        throw new Error(error.message);
+      }
+
       form.setValue("company", data.companyName || "");
       form.setValue("customerPhone", data.companyPhone || form.getValues("customerPhone"));
-      // Potentially set customer address, MC number in customer_info JSONB
-      form.setValue("customerName", data.companyName || form.getValues("customerName")); // Often company name is customer name
+      form.setValue("customerName", data.companyName || form.getValues("customerName"));
       toast({
         title: "USDOT Lookup Successful",
         description: `Found company: ${data.companyName}.`,
@@ -172,6 +216,26 @@ export const NewJobForm = () => {
     }
   };
 
+  const handleCustomerSelect = (customerName: string) => {
+    const selectedCustomer = existingCustomers.find(c => c.customerName === customerName);
+    if (selectedCustomer) {
+      form.setValue("customerName", selectedCustomer.customerName);
+      form.setValue("customerEmail", selectedCustomer.customerEmail || "");
+      form.setValue("customerPhone", selectedCustomer.customerPhone || "");
+      form.setValue("company", selectedCustomer.company || "");
+      form.setValue("usdotNumber", selectedCustomer.usdotNumber || "");
+      toast({
+        title: "Customer Info Loaded",
+        description: `Details for ${selectedCustomer.customerName} have been pre-filled.`,
+      });
+    }
+  };
+
+  const handleJobTypeChange = (jobType: string) => {
+    form.setValue("jobType", jobType);
+    form.setValue("customerConcern", getSuggestedCustomerComplaint(jobType));
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     
@@ -181,17 +245,17 @@ export const NewJobForm = () => {
         customer_name: values.customerName,
         customer_email: values.customerEmail,
         customer_phone: values.customerPhone,
-        company: values.company, // Store company name
+        company: values.company,
         job_type: values.jobType,
         notes: values.notes,
         customer_concern: values.customerConcern,
         recommended_service: values.recommendedService,
-        status: 'open',
-        customer_info: {
+        status: 'open', // Default status for new jobs
+        customer_info: { // Store additional customer/vehicle info as JSONB
           make: values.make,
           model: values.model,
           year: values.year,
-          usdot_number: values.usdotNumber, // Store USDOT in customer_info
+          usdot_number: values.usdotNumber,
           // Add other USDOT fields here if fetched and needed
         },
       }
@@ -240,7 +304,7 @@ export const NewJobForm = () => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4 overflow-y-auto max-h-[calc(90vh-100px)]"> {/* Added overflow-y-auto and max-height */}
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4 overflow-y-auto max-h-[calc(90vh-100px)]">
         <div className="space-y-4 p-4 border rounded-lg">
           <h3 className="font-semibold text-lg">Vehicle Information</h3>
           <FormField
@@ -270,7 +334,7 @@ export const NewJobForm = () => {
                 <FormItem>
                   <FormLabel>Make</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Ford" {...field} disabled />
+                    <Input placeholder="e.g., Ford" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -281,9 +345,9 @@ export const NewJobForm = () => {
               name="model"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Model</FormLabel>
+                  <FormLabel>Model</Label>
                   <FormControl>
-                    <Input placeholder="e.g., F-550" {...field} disabled />
+                    <Input placeholder="e.g., F-550" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -296,7 +360,7 @@ export const NewJobForm = () => {
                 <FormItem>
                   <FormLabel>Year</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 2016" {...field} disabled />
+                    <Input placeholder="e.g., 2016" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -307,6 +371,33 @@ export const NewJobForm = () => {
 
         <div className="space-y-4 p-4 border rounded-lg">
           <h3 className="font-semibold text-lg">Customer & Company Information</h3>
+          {existingCustomers.length > 0 && (
+            <FormField
+              control={form.control}
+              name="customerName" // Using customerName field to trigger selection
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="customerSelect">Select Existing Customer (Optional)</FormLabel>
+                  <FormControl> {/* Wrap the Select component with FormControl */}
+                    <Select onValueChange={handleCustomerSelect}>
+                      <SelectTrigger id="customerSelect">
+                        <SelectValue placeholder="Select a customer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {existingCustomers.map((customer, index) => (
+                          <SelectItem key={index} value={customer.customerName}>
+                            {customer.customerName} {customer.company ? `(${customer.company})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormDescription>Choose a customer to auto-fill their details.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -395,7 +486,7 @@ export const NewJobForm = () => {
               <FormItem>
                 <FormLabel>Job Type</FormLabel>
                 <FormDescription>Select the primary type of service required.</FormDescription>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={handleJobTypeChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select job type" />

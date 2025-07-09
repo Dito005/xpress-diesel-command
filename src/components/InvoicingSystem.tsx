@@ -133,7 +133,7 @@ export const InvoicingSystem = () => {
       .from('invoices')
       .select(`
         *,
-        jobs(customer_name, customer_email, customer_phone, job_type, truck_vin, notes, customer_concern, recommended_service, actual_service),
+        jobs(customer_name, customer_email, customer_phone, job_type, truck_vin, notes, customer_concern, recommended_service, actual_service, customer_info),
         invoice_parts(*, parts(name, cost, part_number)),
         invoice_labor(*, techs(name, hourly_rate)),
         payments(*)
@@ -151,7 +151,7 @@ export const InvoicingSystem = () => {
   const fetchJobs = async () => {
     const { data, error } = await supabase
       .from('jobs')
-      .select('id, job_type, customer_name, customer_email, customer_phone, truck_vin, notes, customer_concern, recommended_service, actual_service')
+      .select('id, job_type, customer_name, customer_email, customer_phone, truck_vin, notes, customer_concern, recommended_service, actual_service, customer_info')
       .not('status', 'eq', 'completed'); // Only show jobs not yet completed/invoiced
     if (error) {
       console.error("Error fetching jobs for invoice creation:", error);
@@ -208,7 +208,8 @@ export const InvoicingSystem = () => {
     if (overriddenPrice !== undefined && overriddenPrice !== null) {
       return overriddenPrice * quantity;
     }
-    return cost * (1 + markup) * quantity;
+    // Markup is a percentage, so divide by 100
+    return cost * (1 + markup / 100) * quantity;
   };
 
   const calculateInvoiceTotals = (invoiceData: z.infer<typeof newInvoiceSchema>) => {
@@ -239,7 +240,7 @@ export const InvoicingSystem = () => {
       return;
     }
 
-    const { total } = calculateInvoiceTotals(values);
+    const { total, taxAmount, cardFeeAmount } = calculateInvoiceTotals(values);
 
     const { data: invoiceData, error: invoiceError } = await supabase.from('invoices').insert([
       {
@@ -254,10 +255,16 @@ export const InvoicingSystem = () => {
           phone: selectedJob.customer_phone,
           truck_vin: selectedJob.truck_vin,
           job_type: selectedJob.job_type,
+          make: selectedJob.customer_info?.make,
+          model: selectedJob.customer_info?.model,
+          year: selectedJob.customer_info?.year,
+          usdot_number: selectedJob.customer_info?.usdot_number,
         },
         customer_concern: values.customerConcern,
         recommended_service: values.recommendedService,
         actual_service: values.actualService,
+        tax_amount: taxAmount, // Store calculated tax amount
+        card_fee_amount: cardFeeAmount, // Store calculated card fee amount
       }
     ]).select().single();
 
@@ -370,6 +377,7 @@ export const InvoicingSystem = () => {
     const partItems = invoice.invoice_parts?.map(item => {
       const partName = item.parts?.name || 'Unknown Part';
       const partCost = item.parts?.cost || 0;
+      // Use the same calculatePartPrice logic as in the form
       const calculatedPrice = calculatePartPrice(partCost, item.markup, item.quantity, item.overridden_price);
       return `
         <tr>
@@ -601,7 +609,7 @@ export const InvoicingSystem = () => {
   );
 
   const currentFormValues = form.watch();
-  const { total: currentTotal } = calculateInvoiceTotals(currentFormValues);
+  const { total: currentTotal, taxAmount: currentTaxAmount, cardFeeAmount: currentCardFeeAmount } = calculateInvoiceTotals(currentFormValues);
 
   return (
     <div className="space-y-6">
@@ -929,16 +937,16 @@ export const InvoicingSystem = () => {
                   <CardContent className="p-4 space-y-2">
                     <div className="flex justify-between font-medium">
                       <span>Subtotal:</span>
-                      <span>${(currentTotal - (calculateInvoiceTotals(currentFormValues).taxAmount || 0) - (calculateInvoiceTotals(currentFormValues).cardFeeAmount || 0)).toFixed(2)}</span>
+                      <span>${(currentTotal - (currentTaxAmount || 0) - (currentCardFeeAmount || 0)).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between font-medium">
                       <span>Tax ({taxSettings.find(ts => ts.id === currentFormValues.taxAreaId)?.tax_percent || 0}%):</span>
-                      <span>${(calculateInvoiceTotals(currentFormValues).taxAmount || 0).toFixed(2)}</span>
+                      <span>${(currentTaxAmount || 0).toFixed(2)}</span>
                     </div>
                     {currentFormValues.paymentMethod && (currentFormValues.paymentMethod === 'stripe' || currentFormValues.paymentMethod === 'cc_physical') && (
                       <div className="flex justify-between font-medium">
                         <span>Card Fee ({taxSettings.find(ts => ts.id === currentFormValues.taxAreaId)?.card_fee_percent || 0}%):</span>
-                        <span>${(calculateInvoiceTotals(currentFormValues).cardFeeAmount || 0).toFixed(2)}</span>
+                        <span>${(currentCardFeeAmount || 0).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-xl font-bold text-blue-700 border-t pt-2 mt-2">

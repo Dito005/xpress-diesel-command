@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label"; // Added Label import
+import { Label } from "@/components/ui/label";
 import { Clock, DollarSign, User, Truck, FileText, Camera, Save, Play, Pause } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,7 @@ import { useSession } from "@/components/SessionProvider";
 export const JobDetailsModal = ({ job, onClose, userRole }) => {
   const { toast } = useToast();
   const [notes, setNotes] = useState(job?.notes || "");
-  const [actualService, setActualService] = useState(job?.actual_service || ""); // New state for actual service
+  const [actualService, setActualService] = useState(job?.actual_service || "");
   const [jobStatus, setJobStatus] = useState(job?.status || "open");
   const [currentJobTimeLog, setCurrentJobTimeLog] = useState(null);
   const { session } = useSession();
@@ -48,9 +48,11 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         if (assignError) {
           console.error("Error fetching job assignments:", assignError);
         } else {
-          // Explicitly type 'assign' to help TypeScript understand the structure
-          // and safely access the name from the potentially array-like 'techs' relation.
-          const names = assignments.map((assign: { techs: Array<{ name: string | null }> | null }) => assign.techs?.[0]?.name).filter(Boolean).join(', ');
+          // Safely access the name from the nested 'techs' relation.
+          // The 'techs' property here is an array of tech objects, even if typically only one.
+          const names = assignments.map((assign: { techs: Array<{ name: string | null }> | null }) => 
+            assign.techs?.[0]?.name // Access the name from the first (and usually only) tech in the array
+          ).filter(Boolean).join(', ');
           setAssignedTechNames(names);
         }
       }
@@ -128,25 +130,49 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
     }
 
     // Simulate calculating total amount based on job details
-    const estimatedAmount = (job.estimated_hours || 0) * 85 + (job.parts_cost || 0); // Example calculation
+    // In a real scenario, this would involve fetching actual labor logs and parts used for this job
+    // For now, we'll use a placeholder or simple calculation.
+    const estimatedAmount = (job.estimated_hours || 0) * 85 + (job.parts_cost || 0) + 200; // Example calculation with a base fee
+
+    // Check if an invoice already exists for this job
+    const { data: existingInvoice, error: existingInvoiceError } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('job_id', job.id)
+      .single();
+
+    if (existingInvoiceError && existingInvoiceError.code !== 'PGRST116') { // PGRST116 means no rows found
+      toast({ variant: "destructive", title: "Error checking existing invoice", description: existingInvoiceError.message });
+      return;
+    }
+
+    if (existingInvoice) {
+      toast({ title: "Invoice Already Exists", description: `An invoice for Job ${job.truck_vin?.slice(-6) || 'N/A'} already exists.` });
+      return;
+    }
 
     const { error } = await supabase.from('invoices').insert([
       {
         job_id: job.id,
-        total: estimatedAmount, // Changed 'amount' to 'total' to match schema
-        // items: { description: job.notes || job.job_type }, // Removed 'items' as it's not in schema
+        total: estimatedAmount,
         status: 'pending',
         customer_name: job.customer_name,
         customer_email: job.customer_email,
-        // Add other required invoice fields if necessary
+        // Populate customer_info from job.customer_info if available
+        customer_info: job.customer_info || {},
+        customer_concern: job.customer_concern,
+        recommended_service: job.recommended_service,
+        actual_service: actualService, // Use the actual service from the modal state
       }
     ]);
 
     if (error) {
       toast({ variant: "destructive", title: "Invoice Generation Failed", description: error.message });
     } else {
-      toast({ title: "Invoice Generated", description: `Invoice for Job ${job.truck_vin.slice(-6)} created.` });
-      // Optionally update job status to 'invoiced'
+      toast({ title: "Invoice Generated", description: `Invoice for Job ${job.truck_vin?.slice(-6) || 'N/A'} created.` });
+      // Optionally update job status to 'invoiced' or 'completed'
+      await supabase.from('jobs').update({ status: 'completed' }).eq('id', job.id);
+      onClose(); // Close modal after generating invoice
     }
   };
 
@@ -157,8 +183,8 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
       .from('jobs')
       .update({
         notes: notes,
-        actual_service: actualService, // Save actual service
-        status: jobStatus, // Save status if it's changed
+        actual_service: actualService,
+        status: jobStatus,
       })
       .eq('id', job.id);
 
@@ -212,7 +238,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                 
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Complaint</Label>
-                  <div className="text-gray-900">{job.notes || 'N/A'}</div>
+                  <div className="text-gray-900">{job.customer_concern || job.notes || 'N/A'}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
