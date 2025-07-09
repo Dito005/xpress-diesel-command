@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Database, Plus, Edit, DollarSign, Clock, Wrench, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 interface JobTemplate {
   id: string;
@@ -27,8 +28,8 @@ interface JobTemplate {
 
 interface PartCost {
   id: string;
-  partNumber: string;
-  description: string;
+  part_number: string; // Changed to part_number
+  name: string; // Changed to name
   cost: number;
   markup: number;
   supplier: string;
@@ -85,35 +86,31 @@ export const BusinessCosts = () => {
     }
   ]);
 
-  const [partCosts, setPartCosts] = useState<PartCost[]>([
-    {
-      id: "part-001",
-      partNumber: "FL-2016",
-      description: "Oil Filter - Cummins ISX",
-      cost: 18.50,
-      markup: 30,
-      supplier: "Fleetguard",
-      category: "Filters"
-    },
-    {
-      id: "part-002",
-      partNumber: "BP-5521",
-      description: "Brake Pads - Freightliner Front",
-      cost: 85.00,
-      markup: 35,
-      supplier: "Bendix",
-      category: "Brake Parts"
-    },
-    {
-      id: "part-003",
-      partNumber: "TF-940",
-      description: "Transmission Filter Kit",
-      cost: 45.00,
-      markup: 35,
-      supplier: "Allison",
-      category: "Transmission"
+  const [partCosts, setPartCosts] = useState<PartCost[]>([]);
+
+  useEffect(() => {
+    fetchParts();
+    const channel = supabase
+      .channel('parts_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parts' }, fetchParts)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchParts = async () => {
+    const { data, error } = await supabase
+      .from('parts')
+      .select('*');
+    if (error) {
+      console.error("Error fetching parts:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to load parts." });
+    } else {
+      setPartCosts(data as PartCost[]);
     }
-  ]);
+  };
 
   const getComplexityColor = (complexity: string) => {
     switch(complexity) {
@@ -130,12 +127,32 @@ export const BusinessCosts = () => {
   );
 
   const filteredParts = partCosts.filter(part =>
-    part.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    part.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    part.part_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const calculatePartPrice = (cost: number, markup: number) => {
     return cost * (1 + markup / 100);
+  };
+
+  const handleAddPart = async (newPart: Omit<PartCost, 'id'>) => {
+    const { error } = await supabase
+      .from('parts')
+      .insert({
+        name: newPart.name,
+        part_number: newPart.part_number,
+        cost: newPart.cost,
+        markup: newPart.markup,
+        supplier: newPart.supplier,
+        category: newPart.category,
+      });
+
+    if (error) {
+      toast({ variant: "destructive", title: "Error adding part", description: error.message });
+    } else {
+      toast({ title: "Part Added", description: `${newPart.name} has been added to the parts database.` });
+      fetchParts();
+    }
   };
 
   return (
@@ -279,40 +296,52 @@ export const BusinessCosts = () => {
                 <DialogHeader>
                   <DialogTitle>Add Part Cost</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.target as HTMLFormElement;
+                  const newPart = {
+                    part_number: (form.elements.namedItem('partNumber') as HTMLInputElement).value,
+                    name: (form.elements.namedItem('description') as HTMLInputElement).value,
+                    category: (form.elements.namedItem('category') as HTMLInputElement).value,
+                    cost: parseFloat((form.elements.namedItem('cost') as HTMLInputElement).value),
+                    markup: parseFloat((form.elements.namedItem('markup') as HTMLInputElement).value),
+                    supplier: (form.elements.namedItem('supplier') as HTMLInputElement).value,
+                  };
+                  handleAddPart(newPart);
+                }} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label>Part Number</Label>
-                      <Input placeholder="FL-2016" />
+                      <Label htmlFor="partNumber">Part Number</Label>
+                      <Input id="partNumber" placeholder="FL-2016" required />
                     </div>
                     <div>
-                      <Label>Category</Label>
-                      <Input placeholder="Filters" />
+                      <Label htmlFor="category">Category</Label>
+                      <Input id="category" placeholder="Filters" />
                     </div>
                   </div>
                   <div>
-                    <Label>Description</Label>
-                    <Input placeholder="Oil Filter - Cummins ISX" />
+                    <Label htmlFor="description">Description</Label>
+                    <Input id="description" placeholder="Oil Filter - Cummins ISX" required />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label>Cost ($)</Label>
-                      <Input type="number" step="0.01" placeholder="18.50" />
+                      <Label htmlFor="cost">Cost ($)</Label>
+                      <Input id="cost" type="number" step="0.01" placeholder="18.50" required />
                     </div>
                     <div>
-                      <Label>Markup (%)</Label>
-                      <Input type="number" placeholder="30" />
+                      <Label htmlFor="markup">Markup (%)</Label>
+                      <Input id="markup" type="number" placeholder="30" required />
                     </div>
                     <div>
-                      <Label>Supplier</Label>
-                      <Input placeholder="Fleetguard" />
+                      <Label htmlFor="supplier">Supplier</Label>
+                      <Input id="supplier" placeholder="Fleetguard" />
                     </div>
                   </div>
                   <div className="flex gap-2 pt-4">
-                    <Button variant="outline" className="flex-1">Cancel</Button>
-                    <Button className="flex-1 bg-blue-600 hover:bg-blue-700">Add Part</Button>
+                    <Button type="button" variant="outline" className="flex-1" onClick={() => { /* Close dialog */ }}>Cancel</Button>
+                    <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">Add Part</Button>
                   </div>
-                </div>
+                </form>
               </DialogContent>
             </Dialog>
           </div>
@@ -335,8 +364,8 @@ export const BusinessCosts = () => {
                   <tbody className="divide-y divide-gray-200">
                     {filteredParts.map((part) => (
                       <tr key={part.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap font-medium">{part.partNumber}</td>
-                        <td className="px-6 py-4">{part.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">{part.part_number}</td>
+                        <td className="px-6 py-4">{part.name}</td>
                         <td className="px-6 py-4 whitespace-nowrap">${part.cost.toFixed(2)}</td>
                         <td className="px-6 py-4 whitespace-nowrap">{part.markup}%</td>
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">

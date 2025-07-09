@@ -13,25 +13,39 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
   const [notes, setNotes] = useState(job?.notes || "");
   const [jobStatus, setJobStatus] = useState(job?.status || "open"); // Default to 'open'
   const [currentJobTimeLog, setCurrentJobTimeLog] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null); // This will be auth.uid()
+  const [currentTechId, setCurrentTechId] = useState(null); // This will be the ID from public.techs
 
   useEffect(() => {
     const fetchUserAndLog = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
-        if (job?.id) {
-          const { data: log, error } = await supabase
-            .from('time_logs')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('job_id', job.id)
-            .is('clock_out', null)
-            .single();
-          if (error && error.code !== 'PGRST116') {
-            console.error("Error fetching current job time log:", error);
-          } else {
-            setCurrentJobTimeLog(log);
+        // Fetch the corresponding tech_id from the public.techs table
+        const { data: techData, error: techError } = await supabase
+          .from('techs')
+          .select('id')
+          .eq('id', user.id) // Assuming auth.uid() is directly used as id in public.techs
+          .single();
+
+        if (techError) {
+          console.error("Error fetching tech ID:", techError);
+          // Don't toast here, as it might be a non-mechanic user
+        } else if (techData) {
+          setCurrentTechId(techData.id);
+          if (job?.id) {
+            const { data: log, error } = await supabase
+              .from('time_logs')
+              .select('*')
+              .eq('tech_id', techData.id) // Changed to 'tech_id'
+              .eq('job_id', job.id)
+              .is('clock_out', null)
+              .single();
+            if (error && error.code !== 'PGRST116') {
+              console.error("Error fetching current job time log:", error);
+            } else {
+              setCurrentJobTimeLog(log);
+            }
           }
         }
       }
@@ -59,7 +73,10 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
   };
 
   const handleClockInOutJob = async () => {
-    if (!currentUserId || !job?.id) return;
+    if (!currentTechId || !job?.id) {
+      toast({ variant: "destructive", title: "Error", description: "Technician not identified or job ID missing." });
+      return;
+    }
 
     if (currentJobTimeLog) {
       // Clock out
@@ -79,7 +96,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
       // Clock in
       const { error } = await supabase
         .from('time_logs')
-        .insert({ user_id: currentUserId, job_id: job.id, clock_in: new Date().toISOString() });
+        .insert({ tech_id: currentTechId, job_id: job.id, clock_in: new Date().toISOString(), type: 'job' }); // Changed to 'tech_id' and added 'type'
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
@@ -89,7 +106,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         const { data: newLog } = await supabase
           .from('time_logs')
           .select('*')
-          .eq('user_id', currentUserId)
+          .eq('tech_id', currentTechId) // Changed to 'tech_id'
           .eq('job_id', job.id)
           .is('clock_out', null)
           .single();

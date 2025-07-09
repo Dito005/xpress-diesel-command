@@ -1,50 +1,75 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MapPin, Phone, Clock, Navigation, AlertTriangle, Wrench, User } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export const RoadServiceDashboard = ({ onJobClick }) => {
-  const [activeCall, setActiveCall] = useState(null);
+  const [roadCalls, setRoadCalls] = useState([]);
+  const [techNames, setTechNames] = useState<Record<string, string>>({});
 
-  const roadCalls = [
-    {
-      id: 1,
-      callNumber: "RS-2024-001",
-      customerName: "Express Logistics",
-      driverName: "John Smith",
-      driverPhone: "(555) 123-4567",
-      unitNumber: "T-8901",
-      location: "I-75 Mile Marker 234",
-      coordinates: { lat: 40.7128, lng: -74.0060 },
-      issue: "Engine overheating, steam from radiator",
-      priority: "high",
-      status: "assigned",
-      estimatedArrival: "25 minutes",
-      assignedTech: "Roberto Silva",
-      callTime: "15 minutes ago",
-      customerType: "Premium"
-    },
-    {
-      id: 2,
-      callNumber: "RS-2024-002",
-      customerName: "City Transport",
-      driverName: "Mike Johnson",
-      driverPhone: "(555) 987-6543",
-      unitNumber: "T-5432",
-      location: "Rest Stop - Exit 45",
-      coordinates: { lat: 40.7589, lng: -73.9851 },
-      issue: "Flat tire, need roadside assistance",
-      priority: "medium",
-      status: "en_route",
-      estimatedArrival: "12 minutes",
-      assignedTech: "Carlos Martinez",
-      callTime: "45 minutes ago",
-      customerType: "Standard"
-    }
-  ];
+  useEffect(() => {
+    const fetchRoadCalls = async () => {
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          assigned_tech:techs(name)
+        `)
+        .eq('job_type', 'Road Service')
+        .in('status', ['open', 'in_progress']);
+
+      if (jobsError) {
+        console.error("Error fetching road calls:", jobsError);
+        return;
+      }
+
+      // Fetch techs for names
+      const { data: techsData, error: techsError } = await supabase
+        .from('techs')
+        .select('id, name');
+      if (techsError) {
+        console.error("Error fetching techs for road service:", techsError);
+        return;
+      }
+      const namesMap = techsData.reduce((acc, tech) => ({ ...acc, [tech.id]: tech.name }), {});
+      setTechNames(namesMap);
+
+      // Simulate additional road call data
+      const enrichedRoadCalls = jobsData.map(job => ({
+        id: job.id,
+        callNumber: `RS-${job.created_at.substring(0, 4)}-${job.truck_vin?.slice(-4) || job.id.slice(0,4)}`,
+        customerName: job.customer_name,
+        driverName: job.customer_info?.driver_name || 'N/A', // Assuming driver_name might be in customer_info
+        driverPhone: job.customer_phone || 'N/A',
+        unitNumber: job.truck_vin || 'N/A',
+        location: job.location || 'Unknown Location', // Assuming location exists
+        coordinates: { lat: 40.7128, lng: -74.0060 }, // Placeholder
+        issue: job.customer_concern || job.notes || 'No specific issue described',
+        priority: job.priority || 'medium',
+        status: job.status === 'in_progress' ? 'en_route' : 'assigned', // Map job status to road call status
+        estimatedArrival: "25 minutes", // Placeholder
+        assignedTech: job.assigned_tech?.name || 'Unassigned',
+        callTime: "15 minutes ago", // Placeholder
+        customerType: "Standard" // Placeholder
+      }));
+      setRoadCalls(enrichedRoadCalls);
+    };
+
+    fetchRoadCalls();
+
+    const channel = supabase
+      .channel('road_service_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchRoadCalls)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchRoadCalls)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const getPriorityColor = (priority) => {
     switch(priority) {
@@ -180,7 +205,7 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
                   </div>
                   <div>
                     <div className="text-gray-600">Tech Assigned:</div>
-                    <div className="font-medium">{call.assignedTech}</div>
+                    <div className="font-medium">{call.assignedTech || 'Unassigned'}</div>
                   </div>
                 </div>
 

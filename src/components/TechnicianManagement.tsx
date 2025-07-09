@@ -18,7 +18,7 @@ export const TechnicianManagement = () => {
     fetchTechnicians();
     const channel = supabase
       .channel('technicians_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchTechnicians)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechnicians) // Changed to 'techs'
       .subscribe();
 
     return () => {
@@ -28,9 +28,8 @@ export const TechnicianManagement = () => {
 
   const fetchTechnicians = async () => {
     const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('role', 'mechanic'); // Only fetch users with 'mechanic' role for this view
+      .from('techs') // Changed to 'techs'
+      .select('*');
 
     if (error) {
       console.error("Error fetching technicians:", error);
@@ -64,18 +63,20 @@ export const TechnicianManagement = () => {
     if (tech.id) {
       // Update existing technician
       const { error } = await supabase
-        .from('users')
+        .from('techs') // Changed to 'techs'
         .update({
           name: tech.name,
           role: tech.role,
-          hourly_rate: tech.hourlyRate,
+          hourly_rate: tech.hourly_rate,
           phone: tech.phone,
           email: tech.email,
           active: tech.active,
           experience: tech.experience,
           efficiency: tech.efficiency,
           location: tech.location,
-          // specialties and certifications would need separate tables or JSONB updates
+          specialties: tech.specialties, // Ensure these are updated if form supports them
+          certifications: tech.certifications, // Ensure these are updated if form supports them
+          updated_at: new Date().toISOString(),
         })
         .eq('id', tech.id);
 
@@ -86,27 +87,34 @@ export const TechnicianManagement = () => {
         fetchTechnicians(); // Re-fetch to ensure UI is up-to-date
       }
     } else {
-      // Add new technician (this would typically be done via auth.admin.inviteUserByEmail)
-      // For this demo, we'll simulate adding to the 'users' table directly for simplicity
-      const { error } = await supabase
-        .from('users')
+      // Add new technician - this should ideally be linked to auth.users creation
+      // For this demo, we'll simulate adding to the 'techs' table directly.
+      // In a real app, you'd create the auth.user first, then insert into techs with auth.uid()
+      // For now, we'll generate a dummy ID or expect it to be passed if linked to auth.signup
+      const { data: newTechData, error } = await supabase
+        .from('techs') // Changed to 'techs'
         .insert({
+          // In a real app, 'id' would come from auth.uid() after user signup
+          // For this demo, we'll let DB generate if not provided, or use a dummy for testing
+          id: tech.id || crypto.randomUUID(), // Generate a new UUID if not provided (for demo purposes)
           name: tech.name,
           role: tech.role,
-          hourly_rate: tech.hourlyRate,
+          hourly_rate: tech.hourly_rate,
           phone: tech.phone,
           email: tech.email,
           active: tech.active,
           experience: tech.experience,
           efficiency: tech.efficiency,
           location: tech.location,
-          // specialties and certifications
-        });
+          specialties: tech.specialties,
+          certifications: tech.certifications,
+        }).select().single();
+
 
       if (error) {
         toast({ variant: "destructive", title: "Error adding technician", description: error.message });
       } else {
-        toast({ title: "Technician Added", description: `${tech.name} has been added to the team.` });
+        toast({ title: "Technician Added", description: `${newTechData.name} has been added to the team.` });
         fetchTechnicians();
       }
     }
@@ -117,7 +125,7 @@ export const TechnicianManagement = () => {
   const handleDeleteTechnician = async (techId: string, techName: string) => {
     if (window.confirm(`Are you sure you want to delete ${techName}? This action cannot be undone.`)) {
       const { error } = await supabase
-        .from('users')
+        .from('techs') // Changed to 'techs'
         .delete()
         .eq('id', techId);
 
@@ -250,7 +258,7 @@ export const TechnicianManagement = () => {
                   
                   <div className="flex items-center gap-4 mt-2">
                     <span className="text-sm">
-                      <span className="font-medium">${tech.hourlyRate}/hr</span>
+                      <span className="font-medium">${tech.hourly_rate}/hr</span>
                     </span>
                     <span className="text-sm">
                       <span className="font-medium">{tech.experience} years</span>

@@ -92,12 +92,49 @@ export const AIHelper = () => {
             customer_info: { name: actionToConfirm.params.customerName },
             description: actionToConfirm.params.description,
             status: 'pending',
-            vehicle_info: {},
+            truck_vin: actionToConfirm.params.truckVin, // Added truck_vin
+            job_type: actionToConfirm.params.jobType, // Added job_type
+            customer_name: actionToConfirm.params.customerName, // Added customer_name
+            customer_email: actionToConfirm.params.customerEmail, // Added customer_email
+            customer_phone: actionToConfirm.params.customerPhone, // Added customer_phone
+            notes: actionToConfirm.params.notes, // Added notes
           }
         ]);
         if (error) throw error;
         success = true;
         successMessage = `Job for ${actionToConfirm.params.customerName} has been created.`;
+      } else if (actionToConfirm.command === 'clock_in_tech') {
+        const { techId, jobId } = actionToConfirm.params;
+        if (!techId) throw new Error("Technician ID is required to clock in.");
+
+        // Check if tech is already clocked in for a shift or job
+        const { data: existingLogs, error: existingLogsError } = await supabase
+          .from('time_logs')
+          .select('*')
+          .eq('tech_id', techId)
+          .is('clock_out', null);
+
+        if (existingLogsError) throw existingLogsError;
+
+        // Clock out any existing active logs for this tech
+        for (const log of existingLogs) {
+          await supabase.from('time_logs').update({ clock_out: new Date().toISOString() }).eq('id', log.id);
+        }
+
+        // Clock in for the new shift/job
+        const { error } = await supabase.from('time_logs').insert([
+          { 
+            tech_id: techId, 
+            job_id: jobId || null, 
+            clock_in: new Date().toISOString(),
+            type: jobId ? 'job' : 'shift', // Differentiate between job and general shift
+            notes: jobId ? `Clocked in for job ${jobId}` : 'General shift clock-in',
+          }
+        ]);
+        if (error) throw error;
+        success = true;
+        const techName = (await supabase.from('techs').select('name').eq('id', techId).single()).data?.name || 'Technician';
+        successMessage = `${techName} has been clocked in ${jobId ? `for job ${jobId}` : 'for their shift'}.`;
       }
       // Add other command handlers here...
 

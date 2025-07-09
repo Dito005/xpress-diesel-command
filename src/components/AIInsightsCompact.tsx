@@ -1,19 +1,57 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Bot, TrendingUp, AlertTriangle, ChevronRight, Lightbulb } from "lucide-react";
 import { AdminAIInsights } from "@/components/AdminAIInsights";
+import { supabase } from "@/lib/supabase";
 
 export const AIInsightsCompact = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [quickStats, setQuickStats] = useState([
+    { label: "Active Alerts", value: "0", color: "text-red-600" },
+    { label: "Opportunities", value: "0", color: "text-green-600" },
+    { label: "Efficiency", value: "0%", color: "text-blue-600" }
+  ]);
 
-  const quickStats = [
-    { label: "Active Alerts", value: "3", color: "text-red-600" },
-    { label: "Opportunities", value: "2", color: "text-green-600" },
-    { label: "Efficiency", value: "92%", color: "text-blue-600" }
-  ];
+  useEffect(() => {
+    const fetchQuickStats = async () => {
+      // Simulate fetching active alerts and opportunities
+      const activeAlerts = Math.floor(Math.random() * 5); // Placeholder
+      const opportunities = Math.floor(Math.random() * 3); // Placeholder
+
+      // Fetch average efficiency from techs table
+      const { data: techs, error: techsError } = await supabase
+        .from('techs')
+        .select('efficiency');
+
+      let avgEfficiency = 0;
+      if (techsError) {
+        console.error("Error fetching techs for AI Insights:", techsError);
+      } else if (techs && techs.length > 0) {
+        const totalEfficiency = techs.reduce((sum, tech) => sum + (tech.efficiency || 0), 0);
+        avgEfficiency = Math.round(totalEfficiency / techs.length);
+      }
+
+      setQuickStats([
+        { label: "Active Alerts", value: activeAlerts.toString(), color: "text-red-600" },
+        { label: "Opportunities", value: opportunities.toString(), color: "text-green-600" },
+        { label: "Efficiency", value: `${avgEfficiency}%`, color: "text-blue-600" }
+      ]);
+    };
+
+    fetchQuickStats();
+
+    const channel = supabase
+      .channel('ai_insights_compact_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchQuickStats)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <>

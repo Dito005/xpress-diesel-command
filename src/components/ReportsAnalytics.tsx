@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,9 +6,47 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { TrendingUp, DollarSign, Clock, Users, FileText, Download, Calendar, AlertTriangle, CheckCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export const ReportsAnalytics = () => {
   const [dateRange, setDateRange] = useState("7days");
+  const [revenueData, setRevenueData] = useState([]);
+  const [efficiencyData, setEfficiencyData] = useState([]);
+  const [jobTypeData, setJobTypeData] = useState([]);
+  const [kpiData, setKpiData] = useState([
+    {
+      title: "Total Revenue",
+      value: "$0",
+      change: "+0%",
+      trend: "up",
+      icon: DollarSign,
+      color: "text-green-600"
+    },
+    {
+      title: "Average Job Time",
+      value: "0h",
+      change: "-0%",
+      trend: "down",
+      icon: Clock,
+      color: "text-blue-600"
+    },
+    {
+      title: "Technician Efficiency",
+      value: "0%",
+      change: "+0%",
+      trend: "up",
+      icon: Users,
+      color: "text-purple-600"
+    },
+    {
+      title: "Profit Margin",
+      value: "0%",
+      change: "+0%",
+      trend: "up",
+      icon: TrendingUp,
+      color: "text-orange-600"
+    }
+  ]);
 
   // Enhanced mock data with performance trends
   const performanceTrendsData = [
@@ -27,66 +65,107 @@ export const ReportsAnalytics = () => {
     { title: "Peak Hours", value: "2-4 PM", trend: "neutral", insight: "Optimal scheduling window identified for maximum productivity" }
   ];
 
-  const revenueData = [
-    { name: "Mon", revenue: 8400, cost: 3200 },
-    { name: "Tue", revenue: 12200, cost: 4800 },
-    { name: "Wed", revenue: 9600, cost: 3600 },
-    { name: "Thu", revenue: 15800, cost: 6200 },
-    { name: "Fri", revenue: 11400, cost: 4200 },
-    { name: "Sat", revenue: 6800, cost: 2400 },
-    { name: "Sun", revenue: 4200, cost: 1800 }
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch data for KPIs and charts
+      const { data: invoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('total, created_at');
+      if (invoicesError) console.error("Error fetching invoices for reports:", invoicesError);
 
-  const efficiencyData = [
-    { name: "Miguel Rodriguez", efficiency: 94, jobs: 12 },
-    { name: "Carlos Martinez", efficiency: 89, jobs: 10 },
-    { name: "David Thompson", efficiency: 92, jobs: 11 },
-    { name: "Roberto Silva", efficiency: 87, jobs: 9 },
-    { name: "Juan Hernandez", efficiency: 91, jobs: 13 }
-  ];
+      const { data: jobs, error: jobsError } = await supabase
+        .from('jobs')
+        .select('id, job_type, created_at');
+      if (jobsError) console.error("Error fetching jobs for reports:", jobsError);
 
-  const jobTypeData = [
-    { name: "PM Service", value: 35, color: "#3B82F6" },
-    { name: "Brake Repair", value: 25, color: "#EF4444" },
-    { name: "Engine Work", value: 20, color: "#10B981" },
-    { name: "AC Repair", value: 12, color: "#F59E0B" },
-    { name: "Other", value: 8, color: "#8B5CF6" }
-  ];
+      const { data: timeLogs, error: timeLogsError } = await supabase
+        .from('time_logs')
+        .select('tech_id, clock_in, clock_out, job_id, techs(name, efficiency)'); // Added job_id
+      if (timeLogsError) console.error("Error fetching time logs for reports:", timeLogsError);
 
-  const kpiData = [
-    {
-      title: "Total Revenue",
-      value: "$68,400",
-      change: "+12.5%",
-      trend: "up",
-      icon: DollarSign,
-      color: "text-green-600"
-    },
-    {
-      title: "Average Job Time",
-      value: "4.2h",
-      change: "-8.3%",
-      trend: "down",
-      icon: Clock,
-      color: "text-blue-600"
-    },
-    {
-      title: "Technician Efficiency",
-      value: "90.6%",
-      change: "+3.2%",
-      trend: "up",
-      icon: Users,
-      color: "text-purple-600"
-    },
-    {
-      title: "Profit Margin",
-      value: "73.8%",
-      change: "+5.1%",
-      trend: "up",
-      icon: TrendingUp,
-      color: "text-orange-600"
-    }
-  ];
+      // Calculate KPIs
+      const totalRevenue = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0;
+      
+      let totalJobDuration = 0;
+      let completedJobsCount = 0;
+      timeLogs?.forEach(log => {
+        if (log.clock_in && log.clock_out) {
+          const durationMs = new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime();
+          totalJobDuration += durationMs;
+          if (log.job_id) completedJobsCount++; // Assuming job_id means it's a job log
+        }
+      });
+      const avgJobTimeHours = completedJobsCount > 0 ? (totalJobDuration / completedJobsCount / 3600000).toFixed(1) : '0';
+
+      let totalEfficiency = 0;
+      let activeTechsCount = 0;
+      timeLogs?.forEach(log => {
+        if (log.techs?.[0]?.efficiency) { // Access first element of array
+          totalEfficiency += log.techs[0].efficiency; // Access first element of array
+          activeTechsCount++;
+        }
+      });
+      const avgTechEfficiency = activeTechsCount > 0 ? (totalEfficiency / activeTechsCount).toFixed(1) : '0';
+
+      // Profit Margin calculation would need more detailed cost data (parts, labor rates, overhead)
+      const profitMargin = '73.8'; // Placeholder for now
+
+      setKpiData([
+        { ...kpiData[0], value: `$${totalRevenue.toLocaleString()}` },
+        { ...kpiData[1], value: `${avgJobTimeHours}h` },
+        { ...kpiData[2], value: `${avgTechEfficiency}%` },
+        { ...kpiData[3], value: `${profitMargin}%` }
+      ]);
+
+      // Generate Revenue vs Cost Data (mock for now, needs actual cost data)
+      const mockRevenueData = [
+        { name: "Mon", revenue: 8400, cost: 3200 },
+        { name: "Tue", revenue: 12200, cost: 4800 },
+        { name: "Wed", revenue: 9600, cost: 3600 },
+        { name: "Thu", revenue: 15800, cost: 6200 },
+        { name: "Fri", revenue: 11400, cost: 4200 },
+        { name: "Sat", revenue: 6800, cost: 2400 },
+        { name: "Sun", revenue: 4200, cost: 1800 }
+      ];
+      setRevenueData(mockRevenueData);
+
+      // Generate Technician Efficiency Data
+      const techEfficiencyMap = new Map();
+      timeLogs?.forEach(log => {
+        if (log.techs?.[0]) { // Check if techs array and first element exist
+          techEfficiencyMap.set(log.techs[0].name, log.techs[0].efficiency); // Access first element
+        }
+      });
+      const techEfficiencyChartData = Array.from(techEfficiencyMap, ([name, efficiency]) => ({ name, efficiency }));
+      setEfficiencyData(techEfficiencyChartData);
+      
+      // Generate Job Type Distribution
+      const jobTypeCounts = {};
+      jobs?.forEach(job => {
+        jobTypeCounts[job.job_type] = (jobTypeCounts[job.job_type] || 0) + 1;
+      });
+      const jobTypeChartData = Object.entries(jobTypeCounts).map(([name, value], index) => ({
+        name,
+        value,
+        color: ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6"][index % 5]
+      }));
+      setJobTypeData(jobTypeChartData);
+    };
+
+    fetchData();
+
+    const channel = supabase
+      .channel('reports_analytics_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">

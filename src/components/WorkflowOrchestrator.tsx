@@ -19,6 +19,7 @@ import {
   PlayCircle,
   PauseCircle
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface SetupRequirement {
   id: string;
@@ -26,7 +27,7 @@ interface SetupRequirement {
   name: string;
   status: 'ready' | 'needed' | 'in_progress' | 'blocked';
   estimatedTime: number; // minutes
-  responsible: string;
+  responsible: string; // Tech ID
   dependencies?: string[];
 }
 
@@ -51,144 +52,125 @@ interface JobWorkflow {
 }
 
 export const WorkflowOrchestrator = () => {
-  const [workflows, setWorkflows] = useState<JobWorkflow[]>([
-    {
-      id: "job-1",
-      unitNumber: "T-2041", 
-      jobType: "AC Repair",
-      priority: "high",
-      status: "pending_setup",
-      customerName: "ABC Transport",
-      setupRequirements: [
-        {
-          id: "setup-1",
-          type: "bay",
-          name: "Lift Bay 3 - Clear & Clean",
-          status: "needed",
-          estimatedTime: 15,
-          responsible: "Parts Runner"
-        },
-        {
-          id: "setup-2", 
-          type: "tool",
-          name: "AC Recovery Unit",
-          status: "ready",
-          estimatedTime: 5,
-          responsible: "Technician"
-        },
-        {
-          id: "setup-3",
-          type: "fluid",
-          name: "R134a Refrigerant (2 lbs)",
-          status: "needed",
-          estimatedTime: 30,
-          responsible: "Parts Runner",
-          dependencies: ["parts-order-1"]
-        }
-      ],
-      approvals: [],
-      dependencies: [],
-      estimatedStartTime: "10:30 AM",
-      urgencyScore: 85,
-      blockingOthers: []
-    },
-    {
-      id: "job-2",
-      unitNumber: "T-1884",
-      jobType: "Brake Systems", 
-      priority: "medium",
-      status: "can_start",
-      customerName: "XYZ Logistics",
-      setupRequirements: [
-        {
-          id: "setup-4",
-          type: "tool",
-          name: "Brake Lathe Setup",
-          status: "ready",
-          estimatedTime: 10,
-          responsible: "Technician"
-        },
-        {
-          id: "setup-5",
-          type: "bay", 
-          name: "Lift Bay 1 - Ready",
-          status: "ready",
-          estimatedTime: 0,
-          responsible: "Available"
-        }
-      ],
-      approvals: [],
-      dependencies: [],
-      estimatedStartTime: "9:00 AM",
-      urgencyScore: 65,
-      blockingOthers: ["job-4"]
-    },
-    {
-      id: "job-3",
-      unitNumber: "T-3401",
-      jobType: "Emergency Repair",
-      priority: "urgent", 
-      status: "pending_approval",
-      customerName: "Priority Freight",
-      setupRequirements: [
-        {
-          id: "setup-6",
-          type: "tool",
-          name: "Mobile Service Unit",
-          status: "ready",
-          estimatedTime: 5,
-          responsible: "Road Tech"
-        }
-      ],
-      approvals: [
-        {
-          type: "Emergency Service Rate",
-          status: "needed",
-          estimatedCost: 450,
-          description: "Emergency callout + alternator replacement"
-        }
-      ],
-      dependencies: [],
-      estimatedStartTime: "ASAP",
-      urgencyScore: 100,
-      blockingOthers: []
-    },
-    {
-      id: "job-4",
-      unitNumber: "T-2205",
-      jobType: "Engine Diagnostics",
-      priority: "low",
-      status: "blocked",
-      customerName: "City Fleet",
-      setupRequirements: [
-        {
-          id: "setup-7",
-          type: "tool",
-          name: "Diagnostic Scanner",
-          status: "ready", 
-          estimatedTime: 5,
-          responsible: "Technician"
-        },
-        {
-          id: "setup-8",
-          type: "bay",
-          name: "Bay 1 (after brake job)",
-          status: "blocked",
-          estimatedTime: 15,
-          responsible: "Technician",
-          dependencies: ["job-2"]
-        }
-      ],
-      approvals: [],
-      dependencies: ["job-2"],
-      estimatedStartTime: "1:00 PM",
-      urgencyScore: 35,
-      blockingOthers: []
-    }
-  ]);
-
+  const [workflows, setWorkflows] = useState<JobWorkflow[]>([]);
+  const [techNames, setTechNames] = useState<Record<string, string>>({}); // Map tech ID to name
   const [activeTab, setActiveTab] = useState("priority-queue");
   
+  useEffect(() => {
+    const fetchWorkflowData = async () => {
+      // Fetch jobs
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select(`
+          id,
+          truck_vin,
+          job_type,
+          priority,
+          status,
+          customer_name,
+          customer_concern,
+          recommended_service,
+          actual_service
+        `);
+      if (jobsError) {
+        console.error("Error fetching jobs for workflow:", jobsError);
+        return;
+      }
+
+      // Fetch techs for names
+      const { data: techsData, error: techsError } = await supabase
+        .from('techs')
+        .select('id, name');
+      if (techsError) {
+        console.error("Error fetching techs for workflow:", techsError);
+        return;
+      }
+      const namesMap = techsData.reduce((acc, tech) => ({ ...acc, [tech.id]: tech.name }), {});
+      setTechNames(namesMap);
+
+      // Simulate setup requirements and approvals for fetched jobs
+      const simulatedWorkflows: JobWorkflow[] = jobsData.map(job => {
+        const baseUrgency = { 'low': 30, 'medium': 60, 'high': 80, 'urgent': 100 }[job.priority] || 50;
+        const randomFactor = Math.floor(Math.random() * 20) - 10; // -10 to +9
+        const urgencyScore = Math.max(0, Math.min(100, baseUrgency + randomFactor));
+
+        const setupReqs: SetupRequirement[] = [
+          {
+            id: `${job.id}-setup-1`,
+            type: "bay",
+            name: `Lift Bay for ${job.job_type}`,
+            status: Math.random() > 0.5 ? "ready" : "needed",
+            estimatedTime: 15,
+            responsible: techsData[Math.floor(Math.random() * techsData.length)]?.id || 'unassigned'
+          },
+          {
+            id: `${job.id}-setup-2`, 
+            type: "tool",
+            name: `Specialized Tool for ${job.job_type}`,
+            status: Math.random() > 0.7 ? "ready" : "needed",
+            estimatedTime: 5,
+            responsible: techsData[Math.floor(Math.random() * techsData.length)]?.id || 'unassigned'
+          }
+        ];
+
+        const approvals: JobWorkflow['approvals'] = [];
+        if (job.priority === 'urgent' || Math.random() > 0.8) {
+          approvals.push({
+            type: "Customer Approval",
+            status: Math.random() > 0.5 ? "approved" : "needed",
+            estimatedCost: Math.floor(Math.random() * 1000) + 500,
+            description: `Approval for ${job.job_type} service`
+          });
+        }
+
+        let workflowStatus: JobWorkflow['status'] = 'ready';
+        if (setupReqs.some(s => s.status === 'needed')) {
+          workflowStatus = 'pending_setup';
+        }
+        if (approvals.some(a => a.status === 'needed')) {
+          workflowStatus = 'pending_approval';
+        }
+        if (workflowStatus === 'pending_setup' && approvals.some(a => a.status === 'needed')) {
+          workflowStatus = 'pending_approval'; // Approval takes precedence if both needed
+        }
+        if (job.status === 'in_progress') {
+          workflowStatus = 'can_start'; // If job is already in progress, it can start
+        } else if (job.status === 'completed') {
+          workflowStatus = 'ready'; // Completed jobs are 'ready' in a sense
+        }
+
+
+        return {
+          id: job.id,
+          unitNumber: job.truck_vin || 'N/A',
+          jobType: job.job_type,
+          priority: job.priority as 'low' | 'medium' | 'high' | 'urgent',
+          status: workflowStatus,
+          customerName: job.customer_name,
+          setupRequirements: setupReqs,
+          approvals: approvals,
+          dependencies: [], // For simplicity, no real dependencies for now
+          estimatedStartTime: "ASAP", // Placeholder
+          urgencyScore: urgencyScore,
+          blockingOthers: [], // Placeholder
+        };
+      });
+      setWorkflows(simulatedWorkflows);
+    };
+
+    fetchWorkflowData();
+
+    const channel = supabase
+      .channel('workflow_orchestrator_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchWorkflowData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchWorkflowData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'ready': return 'bg-green-100 text-green-800 border-green-300';
@@ -329,6 +311,7 @@ export const WorkflowOrchestrator = () => {
                           <div className="flex items-center gap-2">
                             {getSetupStatusIcon(setup.status)}
                             <span className="text-gray-500">{setup.estimatedTime}m</span>
+                            {setup.responsible && <span className="text-gray-500">({techNames[setup.responsible] || 'Unknown'})</span>}
                           </div>
                         </div>
                       ))}

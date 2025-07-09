@@ -44,7 +44,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
         *,
         jobs(description)
       `)
-      .eq('user_id', technician.id)
+      .eq('tech_id', technician.id) // Changed to 'tech_id'
       .order('clock_in', { ascending: false });
 
     if (error) {
@@ -90,7 +90,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
     const { error } = await supabase
       .from('time_logs')
       .insert({
-        user_id: technician.id,
+        tech_id: technician.id, // Changed to 'tech_id'
         job_id: newLog.jobId || null,
         clock_in: new Date(newLog.clockIn).toISOString(),
         clock_out: newLog.clockOut ? new Date(newLog.clockOut).toISOString() : null,

@@ -119,7 +119,7 @@ export const InvoicingSystem = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, fetchInvoices)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchJobs)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'parts' }, fetchParts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchTechs)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechs) 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tax_settings' }, fetchTaxSettings)
       .subscribe();
 
@@ -135,7 +135,7 @@ export const InvoicingSystem = () => {
         *,
         jobs(customer_name, customer_email, customer_phone, job_type, truck_vin, notes, customer_concern, recommended_service, actual_service),
         invoice_parts(*, parts(name, cost, part_number)),
-        invoice_labor(*, users(name, hourly_rate)),
+        invoice_labor(*, techs(name, hourly_rate)),
         payments(*)
       `)
       .order('created_at', { ascending: false });
@@ -173,9 +173,8 @@ export const InvoicingSystem = () => {
 
   const fetchTechs = async () => {
     const { data, error } = await supabase
-      .from('users')
-      .select('id, name, hourly_rate')
-      .eq('role', 'mechanic');
+      .from('techs') 
+      .select('id, name, hourly_rate');
     if (error) {
       console.error("Error fetching technicians:", error);
     } else {
@@ -358,7 +357,7 @@ export const InvoicingSystem = () => {
     const actualService = invoice.jobs?.actual_service || invoice.actual_service || 'No specific notes.';
 
     const laborItems = invoice.invoice_labor?.map(item => {
-      const techName = item.users?.name || 'Unknown Tech';
+      const techName = item.techs?.name || 'Unknown Tech';
       const totalLaborCost = item.hours_worked * item.hourly_rate;
       return `
         <tr>

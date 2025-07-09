@@ -11,14 +11,28 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
   const [technicianJobs, setTechnicianJobs] = useState([]);
   const [currentShiftLog, setCurrentShiftLog] = useState(null);
   const [currentJobLog, setCurrentJobLog] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null); // This will be auth.uid()
+  const [currentTechId, setCurrentTechId] = useState(null); // This will be the ID from public.techs
 
   useEffect(() => {
     const fetchUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
-        fetchTechnicianData(user.id);
+        // Fetch the corresponding tech_id from the public.techs table
+        const { data: techData, error: techError } = await supabase
+          .from('techs')
+          .select('id')
+          .eq('id', user.id) // Assuming auth.uid() is directly used as id in public.techs
+          .single();
+
+        if (techError) {
+          console.error("Error fetching tech ID:", techError);
+          toast({ variant: "destructive", title: "Error", description: "Could not find technician profile." });
+        } else if (techData) {
+          setCurrentTechId(techData.id);
+          fetchTechnicianData(techData.id);
+        }
       }
     };
     fetchUserData();
@@ -27,12 +41,12 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       .channel('technician_dashboard_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, payload => {
         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
-          fetchTechnicianData(currentUserId);
+          fetchTechnicianData(currentTechId);
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, payload => {
         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
-          fetchTechnicianData(currentUserId);
+          fetchTechnicianData(currentTechId);
         }
       })
       .subscribe();
@@ -40,19 +54,19 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
+  }, [currentTechId]); // Depend on currentTechId
 
-  const fetchTechnicianData = async (userId) => {
-    if (!userId) return;
+  const fetchTechnicianData = async (techId) => {
+    if (!techId) return;
 
     // Fetch assigned jobs
     const { data: jobsData, error: jobsError } = await supabase
       .from('jobs')
       .select(`
         *,
-        assigned_tech:users(name)
+        assigned_tech:techs(name)
       `)
-      .eq('assigned_mechanic', userId)
+      .eq('assigned_tech', techId) // Changed to 'assigned_tech'
       .in('status', ['pending', 'in_progress']);
 
     if (jobsError) {
@@ -65,9 +79,9 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     const { data: shiftLog, error: shiftError } = await supabase
       .from('time_logs')
       .select('*')
-      .eq('user_id', userId)
+      .eq('tech_id', techId) // Changed to 'tech_id'
       .is('clock_out', null)
-      .eq('job_id', null) // General shift
+      .is('job_id', null) // General shift
       .single();
 
     if (shiftError && shiftError.code !== 'PGRST116') { // PGRST116 means no rows found
@@ -80,7 +94,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     const { data: jobLog, error: jobLogError } = await supabase
       .from('time_logs')
       .select('*')
-      .eq('user_id', userId)
+      .eq('tech_id', techId) // Changed to 'tech_id'
       .is('clock_out', null)
       .not('job_id', 'is', null) // Specific job
       .single();
@@ -93,6 +107,11 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
   };
 
   const handleClockInOutShift = async () => {
+    if (!currentTechId) {
+      toast({ variant: "destructive", title: "Error", description: "Technician not identified." });
+      return;
+    }
+
     if (currentShiftLog) {
       // Clock out
       const { error } = await supabase
@@ -110,18 +129,23 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       // Clock in
       const { error } = await supabase
         .from('time_logs')
-        .insert({ user_id: currentUserId, clock_in: new Date().toISOString(), notes: 'General Shift' });
+        .insert({ tech_id: currentTechId, clock_in: new Date().toISOString(), type: 'shift' }); // Changed to 'tech_id' and added 'type'
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in." });
       } else {
         toast({ title: "Clocked In", description: "You have clocked in for your shift." });
-        fetchTechnicianData(currentUserId); // Re-fetch to get the new log
+        fetchTechnicianData(currentTechId); // Re-fetch to get the new log
       }
     }
   };
 
   const handleClockInOutJob = async (jobId: string) => {
+    if (!currentTechId) {
+      toast({ variant: "destructive", title: "Error", description: "Technician not identified." });
+      return;
+    }
+
     if (currentJobLog && currentJobLog.job_id === jobId) {
       // Clock out of current job
       const { error } = await supabase
@@ -134,7 +158,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       } else {
         toast({ title: "Job Clocked Out", description: "You have clocked out of the job." });
         setCurrentJobLog(null);
-        fetchTechnicianData(currentUserId);
+        fetchTechnicianData(currentTechId);
       }
     } else {
       // Clock in to new job (and clock out of any other job if active)
@@ -147,13 +171,13 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
 
       const { error } = await supabase
         .from('time_logs')
-        .insert({ user_id: currentUserId, job_id: jobId, clock_in: new Date().toISOString() });
+        .insert({ tech_id: currentTechId, job_id: jobId, clock_in: new Date().toISOString(), type: 'job' }); // Changed to 'tech_id' and added 'type'
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
       } else {
         toast({ title: "Job Clocked In", description: "You have clocked in to the job." });
-        fetchTechnicianData(currentUserId);
+        fetchTechnicianData(currentTechId);
       }
     }
   };
@@ -249,7 +273,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-gray-900">
-                    {job.vehicle_info.vin.slice(-6)} - {job.job_type}
+                    {job.truck_vin.slice(-6)} - {job.job_type}
                   </CardTitle>
                   <Badge className={getStatusColor(job.status)} variant="outline">
                     {job.status === "assigned" ? "Assigned" : 
@@ -260,13 +284,13 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               <CardContent className="space-y-3">
                 <div>
                   <div className="font-medium text-gray-900">{job.description}</div>
-                  <div className="text-sm text-gray-600">{job.customer_info.name}</div>
+                  <div className="text-sm text-gray-600">{job.customer_name}</div>
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Clock className="h-4 w-4" />
-                    Est. {job.estimated_hours}h
+                    Est. {job.estimated_hours || 0}h
                     {job.actual_hours && ` • Worked: ${job.actual_hours}h`}
                   </div>
                   {job.priority === "high" && (

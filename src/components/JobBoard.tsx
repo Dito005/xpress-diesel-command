@@ -16,7 +16,7 @@ export const JobBoard = ({ onJobClick }) => {
         .from('jobs')
         .select(`
           *,
-          assigned_tech:users ( name )
+          assigned_tech:techs ( name )
         `);
       
       if (error) {

@@ -10,7 +10,7 @@ export interface Technician {
   name: string;
   role: 'lead' | 'senior' | 'junior' | 'apprentice';
   specialties: string[];
-  hourlyRate: number;
+  hourly_rate: number; // Changed to hourly_rate to match DB
   phone: string;
   email: string;
   active: boolean;
@@ -32,7 +32,7 @@ export const TechnicianForm = ({ technician, onSave, onCancel }: TechnicianFormP
     name: '',
     role: 'junior',
     specialties: [],
-    hourlyRate: 20,
+    hourly_rate: 20, // Changed to hourly_rate
     phone: '',
     email: '',
     active: true,
@@ -91,12 +91,12 @@ export const TechnicianForm = ({ technician, onSave, onCancel }: TechnicianFormP
 
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
+          <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
           <Input
-            id="hourlyRate"
+            id="hourly_rate"
             type="number"
-            value={formData.hourlyRate}
-            onChange={(e) => setFormData(prev => ({ ...prev, hourlyRate: parseFloat(e.target.value) || 0 }))}
+            value={formData.hourly_rate}
+            onChange={(e) => setFormData(prev => ({ ...prev, hourly_rate: parseFloat(e.target.value) || 0 }))}
           />
         </div>
         <div>

@@ -44,13 +44,13 @@ const Index = () => {
       const today = new Date().toISOString().split('T')[0];
       const { data: invoices, error: invoicesError } = await supabase
         .from('invoices')
-        .select('amount')
+        .select('total') // Changed from 'amount' to 'total'
         .gte('created_at', `${today}T00:00:00.000Z`);
       if (invoicesError) console.error('Error fetching invoices for KPIs', invoicesError);
 
       const pendingJobs = jobs?.filter(j => j.status === 'pending' || j.status === 'waiting_parts').length || 0;
       const activeJobs = jobs?.filter(j => j.status === 'in_progress').length || 0;
-      const todaysProfit = invoices?.reduce((sum, inv) => sum + inv.amount, 0) || 0;
+      const todaysProfit = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0; // Changed from 'amount' to 'total'
 
       setKpiData(prev => ({ ...prev, pendingJobs, activeJobs, todaysProfit }));
     };
@@ -58,8 +58,9 @@ const Index = () => {
     const calculateLaborCost = async () => {
         const { data: clockedInTechs, error } = await supabase
             .from('time_logs')
-            .select('users(hourly_rate)')
-            .is('clock_out', null);
+            .select('techs(hourly_rate)') // Changed to 'techs'
+            .is('clock_out', null)
+            .eq('type', 'shift'); // Only count general shift logs
 
         if (error) {
             console.error("Error fetching clocked in techs:", error);
@@ -67,9 +68,8 @@ const Index = () => {
         }
 
         const totalHourlyRate = clockedInTechs.reduce((sum, log) => {
-            // The 'users' property is inferred as an array, so we access the first element.
-            const userProfile = log.users?.[0];
-            return sum + (userProfile?.hourly_rate || 0);
+            const techProfile = log.techs?.[0]; // Access the first element of the array
+            return sum + (techProfile?.hourly_rate || 0);
         }, 0);
         return totalHourlyRate;
     };

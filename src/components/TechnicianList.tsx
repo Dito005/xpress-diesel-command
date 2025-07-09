@@ -11,10 +11,10 @@ interface Technician {
   id: string;
   name: string;
   role: string;
-  current_activity: string; // Renamed to match potential DB column
+  current_activity: string;
   location: string;
   status: 'active' | 'break' | 'offline';
-  hourly_rate: number; // Added for time log calculations
+  hourly_rate: number;
   email: string;
   phone: string;
   efficiency: number;
@@ -33,7 +33,7 @@ export const TechnicianList = () => {
     fetchTechnicians();
     const channel = supabase
       .channel('technician_list_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchTechnicians)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechnicians) // Changed to 'techs'
       .subscribe();
 
     return () => {
@@ -43,9 +43,8 @@ export const TechnicianList = () => {
 
   const fetchTechnicians = async () => {
     const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('role', 'mechanic'); // Fetch only mechanics
+      .from('techs') // Changed to 'techs'
+      .select('*');
 
     if (error) {
       console.error("Error fetching technicians:", error);

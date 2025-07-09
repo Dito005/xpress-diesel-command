@@ -1,61 +1,86 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Clock, Package, MapPin, CheckCircle, AlertTriangle, Search, Truck } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+interface TechData {
+  id: string;
+  name: string;
+}
 
 export const PartsRunnerDashboard = ({ onJobClick }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [partsRequests, setPartsRequests] = useState([]);
+  const [techNames, setTechNames] = useState<Record<string, string>>({});
 
-  const partsRequests = [
-    {
-      id: 1,
-      jobId: 2,
-      unitNumber: "T-1507",
-      partName: "AC Compressor",
-      partNumber: "AC-4501-B",
-      quantity: 1,
-      urgency: "high",
-      requestedBy: "Carlos Martinez",
-      supplier: "Freightliner Parts",
-      estimatedCost: 450,
-      status: "pending_pickup",
-      requestTime: "2 hours ago",
-      location: "Downtown Warehouse"
-    },
-    {
-      id: 2,
-      jobId: 3,
-      unitNumber: "T-3302",
-      partName: "Brake Chamber",
-      partNumber: "BC-2205-R",
-      quantity: 2,
-      urgency: "medium",
-      requestedBy: "David Thompson",
-      supplier: "Bendix Parts",
-      estimatedCost: 180,
-      status: "out_for_pickup",
-      requestTime: "4 hours ago",
-      location: "North Side Parts"
-    },
-    {
-      id: 3,
-      jobId: 1,
-      unitNumber: "T-2041",
-      partName: "Oil Filter",
-      partNumber: "OF-1234-X",
-      quantity: 3,
-      urgency: "low",
-      requestedBy: "Miguel Rodriguez",
-      supplier: "Local Auto Parts",
-      estimatedCost: 45,
-      status: "delivered",
-      requestTime: "6 hours ago",
-      location: "Main Street Auto"
-    }
-  ];
+  useEffect(() => {
+    const fetchPartsRequests = async () => {
+      // Fetch parts requests (simulated from jobs for now, or a dedicated parts_requests table)
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select(`
+          id,
+          truck_vin,
+          job_type,
+          priority,
+          status,
+          customer_name,
+          notes,
+          assigned_tech:techs(name)
+        `)
+        .in('status', ['waiting_parts', 'in_progress']); // Jobs that might need parts
+
+      if (jobsError) {
+        console.error("Error fetching jobs for parts requests:", jobsError);
+        return;
+      }
+
+      // Fetch techs for names
+      const { data, error: techsError } = await supabase
+        .from('techs')
+        .select('id, name');
+      if (techsError) {
+        console.error("Error fetching techs for parts runner:", techsError);
+        return;
+      }
+      const techsData: TechData[] = data || []; // Explicitly type data here
+      const namesMap = techsData.reduce((acc, tech) => ({ ...acc, [tech.id]: tech.name }), {});
+      setTechNames(namesMap);
+
+      // Simulate parts requests from jobs
+      const simulatedRequests = jobsData.map(job => ({
+        id: job.id,
+        jobId: job.id,
+        unitNumber: job.truck_vin || 'N/A',
+        partName: `Part for ${job.job_type}`, // Placeholder
+        partNumber: `PN-${job.id.slice(0,4)}`, // Placeholder
+        quantity: Math.floor(Math.random() * 3) + 1,
+        urgency: job.priority || 'medium',
+        requestedBy: job.assigned_tech?.name || 'Unassigned',
+        supplier: "Local Supplier", // Placeholder
+        estimatedCost: Math.floor(Math.random() * 300) + 50,
+        status: job.status === 'waiting_parts' ? 'pending_pickup' : 'out_for_pickup', // Map job status
+        requestTime: "2 hours ago", // Placeholder
+        location: "Warehouse A" // Placeholder
+      }));
+      setPartsRequests(simulatedRequests);
+    };
+
+    fetchPartsRequests();
+
+    const channel = supabase
+      .channel('parts_runner_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchPartsRequests)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchPartsRequests)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const getUrgencyColor = (urgency) => {
     switch(urgency) {

@@ -1,17 +1,62 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bot, TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign, Users, Wrench, Lightbulb, Target } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export const AdminAIInsights = () => {
   const [insights, setInsights] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [liveMetrics, setLiveMetrics] = useState([
+    { label: "Jobs Today", value: "0", trend: "+0", icon: Wrench },
+    { label: "Revenue", value: "$0", trend: "+0%", icon: DollarSign },
+    { label: "Efficiency", value: "0%", trend: "+0%", icon: TrendingUp },
+    { label: "Customer Sat", value: "0/5", trend: "+0", icon: CheckCircle }
+  ]);
 
   useEffect(() => {
-    // Simulate loading AI insights
-    setTimeout(() => {
+    const fetchInsightsAndMetrics = async () => {
+      setIsLoading(true);
+
+      // Fetch jobs for "Jobs Today"
+      const today = new Date().toISOString().split('T')[0];
+      const { data: jobsToday, error: jobsError } = await supabase
+        .from('jobs')
+        .select('id')
+        .gte('created_at', `${today}T00:00:00.000Z`);
+      const numJobsToday = jobsToday?.length || 0;
+
+      // Fetch invoices for "Revenue"
+      const { data: invoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('total')
+        .gte('created_at', `${today}T00:00:00.000Z`);
+      const totalRevenueToday = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0;
+
+      // Fetch techs for "Efficiency"
+      const { data: techs, error: techsError } = await supabase
+        .from('techs')
+        .select('efficiency');
+      let avgEfficiency = 0;
+      if (techsError) {
+        console.error("Error fetching techs for Admin AI Insights:", techsError);
+      } else if (techs && techs.length > 0) {
+        const totalEfficiency = techs.reduce((sum, tech) => sum + (tech.efficiency || 0), 0);
+        avgEfficiency = Math.round(totalEfficiency / techs.length);
+      }
+
+      // Simulate Customer Sat (no direct DB table for this yet)
+      const customerSat = (4.0 + Math.random() * 0.9).toFixed(1);
+
+      setLiveMetrics([
+        { label: "Jobs Today", value: numJobsToday.toString(), trend: "+3", icon: Wrench },
+        { label: "Revenue", value: `$${(totalRevenueToday / 1000).toFixed(1)}K`, trend: "+18%", icon: DollarSign },
+        { label: "Efficiency", value: `${avgEfficiency}%`, trend: "+5%", icon: TrendingUp },
+        { label: "Customer Sat", value: `${customerSat}/5`, trend: "+0.2", icon: CheckCircle }
+      ]);
+
+      // Simulate AI insights
       setInsights([
         {
           id: 1,
@@ -59,15 +104,21 @@ export const AdminAIInsights = () => {
         }
       ]);
       setIsLoading(false);
-    }, 2000);
-  }, []);
+    };
 
-  const liveMetrics = [
-    { label: "Jobs Today", value: "16", trend: "+3", icon: Wrench },
-    { label: "Revenue", value: "$12.4K", trend: "+18%", icon: DollarSign },
-    { label: "Efficiency", value: "92%", trend: "+5%", icon: TrendingUp },
-    { label: "Customer Sat", value: "4.7/5", trend: "+0.2", icon: CheckCircle }
-  ];
+    fetchInsightsAndMetrics();
+
+    const channel = supabase
+      .channel('admin_ai_insights_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchInsightsAndMetrics)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, fetchInsightsAndMetrics)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchInsightsAndMetrics)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const getPriorityColor = (priority) => {
     switch(priority) {

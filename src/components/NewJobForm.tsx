@@ -38,7 +38,10 @@ const formSchema = z.object({
   customerEmail: z.string().email("Invalid email address").optional().or(z.literal('')),
   customerPhone: z.string().min(1, "Customer phone is required"),
   jobType: z.string().min(1, "Job type is required"),
-  notes: z.string().min(10, "Please provide a detailed complaint/notes"),
+  customerConcern: z.string().min(10, "Please provide a detailed customer concern"), // New field
+  recommendedService: z.string().optional(), // New field
+  actualService: z.string().optional(), // New field
+  notes: z.string().optional(), // Renamed from notes to customerConcern, keeping notes for general use
 });
 
 export const NewJobForm = () => {
@@ -57,6 +60,9 @@ export const NewJobForm = () => {
       customerEmail: "",
       customerPhone: "",
       jobType: "",
+      customerConcern: "", // Default for new field
+      recommendedService: "", // Default for new field
+      actualService: "", // Default for new field
       notes: "",
     },
   });
@@ -106,10 +112,16 @@ export const NewJobForm = () => {
         customer_email: values.customerEmail,
         customer_phone: values.customerPhone,
         job_type: values.jobType,
-        notes: values.notes,
+        notes: values.notes, // General notes
+        customer_concern: values.customerConcern, // New field
+        recommended_service: values.recommendedService, // New field
+        actual_service: values.actualService, // New field
         status: 'open', // Default status for new jobs
-        // Assuming 'make', 'model', 'year' are not directly stored in 'jobs' table,
-        // or are part of a separate 'vehicles' table. For now, they are just for VIN lookup display.
+        customer_info: { // Store vehicle info in customer_info JSONB
+          make: values.make,
+          model: values.model,
+          year: values.year,
+        },
       }
     ]);
 
@@ -268,12 +280,51 @@ export const NewJobForm = () => {
           </div>
           <FormField
             control={form.control}
+            name="customerConcern"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Customer Complaint</FormLabel>
+                <FormControl>
+                  <Textarea placeholder="Describe the customer's issue..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="recommendedService"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Recommended Service (Optional)</FormLabel>
+                <FormControl>
+                  <Textarea placeholder="Any recommended services..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="actualService"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Actual Service Performed (Optional)</FormLabel>
+                <FormControl>
+                  <Textarea placeholder="What work was actually performed..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
             name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Customer Complaint / Notes</FormLabel>
+                <FormLabel>Internal Notes (Optional)</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="Describe the issue with the vehicle..." {...field} />
+                  <Textarea placeholder="Any internal notes for the job..." {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Brain, Clock, Wrench, Package, AlertTriangle, CheckCircle, Users, MapPin, GraduationCap } from "lucide-react";
+import { supabase } from "@/lib/supabase"; // Import supabase
 
 // Enhanced data structures
 interface TechnicianSkill {
@@ -33,66 +34,108 @@ interface AssignmentSuggestion {
 }
 
 export const AIJobAnalyzer = () => {
-  // Mock data with new fields
-  const [technicians] = useState<TechnicianSkill[]>([
-    { id: "tech-1", name: "Oscar Rodriguez", skills: { "AC Repair": { level: 9 }, "Engine Diagnostics": { level: 8 } }, availability: 'available', currentLoad: 0, trainingNeeds: ["Transmission"] },
-    { id: "tech-2", name: "Miguel Santos", skills: { "Brake Systems": { level: 10 }, "Suspension": { level: 8 } }, availability: 'busy', currentLoad: 2, trainingNeeds: ["AC Repair"] },
-    { id: "tech-3", name: "Jake Wilson", skills: { "Road Service": { level: 9 }, "Brake Systems": { level: 5 } }, availability: 'available', currentLoad: 1, trainingNeeds: ["Engine Diagnostics"] },
-    { id: "tech-4", name: "Ana Petrova", skills: { "Transmission": { level: 4 } }, availability: 'available', currentLoad: 0, trainingNeeds: ["Brake Systems", "Suspension"] },
-  ]);
-
-  const [openJobs] = useState<JobRequirement[]>([
-    { id: "job-1", unitNumber: "T-2041", jobType: "AC Repair", priority: "high", requiredSkills: ["AC Repair"], isTrainingOpportunity: false },
-    { id: "job-2", unitNumber: "T-1884", jobType: "Brake Systems", priority: "medium", requiredSkills: ["Brake Systems"], isTrainingOpportunity: true },
-    { id: "job-3", unitNumber: "T-3401", jobType: "Engine Diagnostics", priority: "urgent", requiredSkills: ["Engine Diagnostics"], isTrainingOpportunity: false },
-  ]);
-
+  const [technicians, setTechnicians] = useState<TechnicianSkill[]>([]);
+  const [openJobs, setOpenJobs] = useState<JobRequirement[]>([]);
   const [assignments, setAssignments] = useState<AssignmentSuggestion[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch technicians from the 'techs' table
+      const { data: techsData, error: techsError } = await supabase
+        .from('techs')
+        .select('id, name, efficiency_by_type, is_available'); // Assuming efficiency_by_type and is_available exist
+
+      if (techsError) {
+        console.error("Error fetching technicians for AI Analyzer:", techsError);
+        return;
+      }
+
+      const mappedTechs: TechnicianSkill[] = techsData.map(tech => ({
+        id: tech.id,
+        name: tech.name,
+        skills: tech.efficiency_by_type || {}, // Map efficiency_by_type to skills
+        availability: tech.is_available ? 'available' : 'busy', // Map is_available to availability
+        currentLoad: 0, // Placeholder, would need to fetch from jobs/time_logs
+        trainingNeeds: [], // Placeholder
+      }));
+      setTechnicians(mappedTechs);
+
+      // Fetch open jobs from the 'jobs' table
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select('id, truck_vin, job_type, priority, customer_concern'); // Assuming these columns exist
+
+      if (jobsError) {
+        console.error("Error fetching jobs for AI Analyzer:", jobsError);
+        return;
+      }
+
+      const mappedJobs: JobRequirement[] = jobsData.map(job => ({
+        id: job.id,
+        unitNumber: job.truck_vin || 'N/A',
+        jobType: job.job_type,
+        priority: job.priority as 'low' | 'medium' | 'high' | 'urgent',
+        requiredSkills: [job.job_type], // Simple mapping for now, could be more complex
+        isTrainingOpportunity: false, // Placeholder
+      }));
+      setOpenJobs(mappedJobs);
+
+      calculateAssignments();
+    };
+
+    fetchData();
+
+    const channel = supabase
+      .channel('ai_analyzer_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const calculateAssignments = () => {
     setIsAnalyzing(true);
-    setTimeout(() => {
-      const suggestions: AssignmentSuggestion[] = [];
-      openJobs.forEach(job => {
-        let bestMatch: AssignmentSuggestion | null = null;
+    const suggestions: AssignmentSuggestion[] = [];
+    openJobs.forEach(job => {
+      let bestMatch: AssignmentSuggestion | null = null;
+      
+      technicians.forEach(tech => {
+        // New Scoring Logic
+        const skillLevel = tech.skills[job.requiredSkills[0]]?.level || 0;
+        const skillScore = (skillLevel / 10) * 50; // 50% weight for skill
+        const availabilityScore = tech.availability === 'available' ? 30 : 0; // 30% weight for availability
+        const loadScore = (1 - Math.min(tech.currentLoad / 2, 1)) * 10; // 10% weight for load
+        const trainingScore = tech.trainingNeeds.includes(job.requiredSkills[0]) && job.isTrainingOpportunity ? 20 : 0; // 20% bonus for training
+
+        const confidenceScore = Math.round(skillScore + availabilityScore + loadScore + trainingScore);
         
-        technicians.forEach(tech => {
-          // New Scoring Logic
-          const skillLevel = tech.skills[job.requiredSkills[0]]?.level || 0;
-          const skillScore = (skillLevel / 10) * 50; // 50% weight for skill
-          const availabilityScore = tech.availability === 'available' ? 30 : 0; // 30% weight for availability
-          const loadScore = (1 - Math.min(tech.currentLoad / 2, 1)) * 10; // 10% weight for load
-          const trainingScore = tech.trainingNeeds.includes(job.requiredSkills[0]) && job.isTrainingOpportunity ? 20 : 0; // 20% bonus for training
+        const reasoning = [
+          `Skill Level: ${skillLevel}/10`,
+          `Availability: ${tech.availability}`,
+          `Training Opportunity: ${trainingScore > 0 ? 'Yes' : 'No'}`
+        ];
 
-          const confidenceScore = Math.round(skillScore + availabilityScore + loadScore + trainingScore);
-          
-          const reasoning = [
-            `Skill Level: ${skillLevel}/10`,
-            `Availability: ${tech.availability}`,
-            `Training Opportunity: ${trainingScore > 0 ? 'Yes' : 'No'}`
-          ];
+        const suggestion: AssignmentSuggestion = {
+          jobId: job.id,
+          techId: tech.id,
+          confidenceScore: Math.min(100, confidenceScore),
+          reasoning,
+          isTrainingAssignment: trainingScore > 0,
+        };
 
-          const suggestion: AssignmentSuggestion = {
-            jobId: job.id,
-            techId: tech.id,
-            confidenceScore: Math.min(100, confidenceScore),
-            reasoning,
-            isTrainingAssignment: trainingScore > 0,
-          };
-
-          if (!bestMatch || suggestion.confidenceScore > bestMatch.confidenceScore) {
-            bestMatch = suggestion;
-          }
-        });
-        if (bestMatch) suggestions.push(bestMatch);
+        if (!bestMatch || suggestion.confidenceScore > bestMatch.confidenceScore) {
+          bestMatch = suggestion;
+        }
       });
-      setAssignments(suggestions);
-      setIsAnalyzing(false);
-    }, 1500);
+      if (bestMatch) suggestions.push(bestMatch);
+    });
+    setAssignments(suggestions);
+    setIsAnalyzing(false);
   };
-
-  useEffect(() => { calculateAssignments(); }, []);
 
   const getJobById = (id: string) => openJobs.find(job => job.id === id);
   const getTechById = (id: string) => technicians.find(tech => tech.id === id);

@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot, TrendingUp, DollarSign, Calculator, Lightbulb, CheckCircle, AlertTriangle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export const PricingAI = () => {
   const [jobType, setJobType] = useState("");
@@ -16,6 +16,21 @@ export const PricingAI = () => {
   const [customerType, setCustomerType] = useState("");
   const [pricingResult, setPricingResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [techs, setTechs] = useState([]); // To fetch tech data for dynamic pricing factors
+
+  useEffect(() => {
+    const fetchTechs = async () => {
+      const { data, error } = await supabase
+        .from('techs')
+        .select('id, name, hourly_rate, efficiency, efficiency_by_type'); // Fetch relevant tech data
+      if (error) {
+        console.error("Error fetching techs for Pricing AI:", error);
+      } else {
+        setTechs(data);
+      }
+    };
+    fetchTechs();
+  }, []);
 
   const handleCalculatePricing = () => {
     setIsLoading(true);
@@ -30,7 +45,15 @@ export const PricingAI = () => {
         customer: getCustomerMultiplier(customerType)
       };
       
-      const calculatedPrice = basePrice * multipliers.vehicle * multipliers.complexity * multipliers.urgency * multipliers.customer;
+      let calculatedPrice = basePrice * multipliers.vehicle * multipliers.complexity * multipliers.urgency * multipliers.customer;
+
+      // Incorporate average tech efficiency into pricing (example)
+      if (techs.length > 0) {
+        const totalEfficiency = techs.reduce((sum, tech) => sum + (tech.efficiency || 0), 0);
+        const avgEfficiency = totalEfficiency / techs.length;
+        calculatedPrice *= (1 + (100 - avgEfficiency) / 1000); // Small adjustment based on overall efficiency
+      }
+
       const marketRate = calculatedPrice * (0.9 + Math.random() * 0.2); // Simulate market variance
       
       setPricingResult({
