@@ -1,10 +1,9 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Clock, DollarSign, Users, Wrench, MapPin, Plus, Bot, Package, FileText, Calculator, TrendingUp, Settings, Database, Brain, Workflow } from "lucide-react";
+import { Truck, Clock, DollarSign, Users, Wrench, MapPin, Plus, Bot, Package, FileText, Calculator, TrendingUp, Settings, Database, Brain, Workflow, AlertTriangle, BarChart } from "lucide-react";
 import { JobBoard } from "@/components/JobBoard";
 import { TechnicianDashboard } from "@/components/TechnicianDashboard";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
@@ -12,7 +11,6 @@ import { PartsRunnerDashboard } from "@/components/PartsRunnerDashboard";
 import { RoadServiceDashboard } from "@/components/RoadServiceDashboard";
 import { ReportsAnalytics } from "@/components/ReportsAnalytics";
 import { AIHelper } from "@/components/AIHelper";
-import { AdminAIInsights } from "@/components/AdminAIInsights";
 import { AIInsightsCompact } from "@/components/AIInsightsCompact";
 import { InvoicingSystem } from "@/components/InvoicingSystem";
 import { ShopSettings } from "@/components/ShopSettings";
@@ -25,14 +23,37 @@ import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
 const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [userRole, setUserRole] = useState("admin"); // admin, manager, mechanic, road, parts
+  const [liveLaborCost, setLiveLaborCost] = useState(0);
 
   // Mock data for demonstration
+  const jobsData = [
+    { status: "not_started" }, { status: "in_progress" }, { status: "waiting_parts" },
+    { status: "waiting_approval" }, { status: "in_progress" }, { status: "completed" }
+  ];
+  const clockedInTechs = [
+    { name: "Mike Rodriguez", hourlyRate: 35 },
+    { name: "Sarah Johnson", hourlyRate: 28 },
+    { name: "Carlos Martinez", hourlyRate: 22 },
+  ];
+
+  useEffect(() => {
+    const totalHourlyRate = clockedInTechs.reduce((sum, tech) => sum + tech.hourlyRate, 0);
+    const costPerSecond = totalHourlyRate / 3600;
+
+    const interval = setInterval(() => {
+      setLiveLaborCost(prevCost => prevCost + costPerSecond);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+
   const kpiData = {
-    todayJobs: { completed: 8, inProgress: 5, notStarted: 3 },
+    pendingJobs: jobsData.filter(j => ["not_started", "waiting_parts", "waiting_approval"].includes(j.status)).length,
     dailyRevenue: 12450,
-    laborCost: 3200,
-    netProfit: 9250,
-    techEfficiency: 87
+    activeJobs: jobsData.filter(j => j.status === "in_progress").length,
+    efficiency: { value: 87, change: 5 }, // 5% increase from last month
+    profitMargin: 73.8,
   };
 
   const handleJobClick = (job) => {
@@ -58,12 +79,10 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <div className="bg-blue-600 rounded-lg p-2">
-                <Truck className="h-6 w-6 text-white" />
-              </div>
+              <img src="/logo.png" alt="Xpress Diesel Repair Logo" className="h-10" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Xpress Diesel Repair</h1>
-                <p className="text-sm text-gray-500">Management System</p>
+                <h1 className="text-xl font-bold text-gray-900 -mb-1">Xpress Diesel Repair</h1>
+                <p className="text-sm font-semibold text-blue-600">Software</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -88,16 +107,19 @@ const Index = () => {
           <div className="flex gap-6 mb-8">
             {/* KPI Cards */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+              <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-blue-100">Today's Jobs</CardTitle>
+                  <CardTitle className="text-sm font-medium text-yellow-100 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Pending Jobs
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold mb-1">
-                    {kpiData.todayJobs.completed + kpiData.todayJobs.inProgress + kpiData.todayJobs.notStarted}
+                    {kpiData.pendingJobs}
                   </div>
-                  <div className="text-xs text-blue-100">
-                    ✅ {kpiData.todayJobs.completed} • 🔄 {kpiData.todayJobs.inProgress} • ⏳ {kpiData.todayJobs.notStarted}
+                  <div className="text-xs text-yellow-100">
+                    Awaiting parts or approval
                   </div>
                 </CardContent>
               </Card>
@@ -106,38 +128,41 @@ const Index = () => {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-green-100 flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    Daily Revenue
+                    Revenue Today
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">${kpiData.dailyRevenue.toLocaleString()}</div>
-                  <div className="text-xs text-green-100">Net: ${kpiData.netProfit.toLocaleString()}</div>
+                  <div className="text-xs text-green-100">Projected: $15,000</div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+              <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-orange-100 flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium text-red-100 flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    Labor Cost
+                    Live Labor Cost
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${kpiData.laborCost.toLocaleString()}</div>
-                  <div className="text-xs text-orange-100">Efficiency: {kpiData.techEfficiency}%</div>
+                  <div className="text-2xl font-bold">${liveLaborCost.toFixed(2)}</div>
+                  <div className="text-xs text-red-100">{clockedInTechs.length} techs clocked in</div>
                 </CardContent>
               </Card>
 
               <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-purple-100 flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Active Techs
+                    <BarChart className="h-4 w-4" />
+                    Live Metrics
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">6</div>
-                  <div className="text-xs text-purple-100">4 Shop • 2 Road</div>
+                  <div className="text-lg font-bold">{kpiData.profitMargin}% Profit Margin</div>
+                  <div className="text-xs text-purple-100 mt-1">
+                    {kpiData.activeJobs} active jobs • {kpiData.efficiency.value}% efficiency 
+                    <span className="text-green-300"> (+{kpiData.efficiency.change}%)</span>
+                  </div>
                 </CardContent>
               </Card>
             </div>

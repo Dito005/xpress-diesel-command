@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Building, DollarSign, Clock, Save } from "lucide-react";
+import { Settings, Building, DollarSign, Clock, Save, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export const ShopSettings = () => {
@@ -30,11 +30,27 @@ export const ShopSettings = () => {
       friday: { open: "07:00", close: "18:00", enabled: true },
       saturday: { open: "08:00", close: "16:00", enabled: true },
       sunday: { open: "09:00", close: "15:00", enabled: false }
+    },
+    overhead: {
+      rent: "5000",
+      utilities: "1500",
+      insurance: "1000",
+      other: "500"
     }
   });
 
   const updateShopConfig = (field: string, value: any) => {
     setShopConfig(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateOverhead = (field: string, value: string) => {
+    setShopConfig(prev => ({
+      ...prev,
+      overhead: {
+        ...prev.overhead,
+        [field]: value
+      }
+    }));
   };
 
   const updateBusinessHour = (day: string, field: string, value: any) => {
@@ -71,11 +87,12 @@ export const ShopSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="pricing">Pricing</TabsTrigger>
           <TabsTrigger value="hours">Business Hours</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing</TabsTrigger>
+          <TabsTrigger value="overhead">Overhead</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -251,6 +268,60 @@ export const ShopSettings = () => {
                   <Switch
                     checked={shopConfig.requireApproval}
                     onCheckedChange={(checked) => updateShopConfig('requireApproval', checked)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="overhead" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Home className="h-5 w-5" />
+                Monthly Overhead Costs
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Enter your fixed monthly overhead costs to improve profit margin calculations.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="rent">Rent / Mortgage ($)</Label>
+                  <Input
+                    id="rent"
+                    type="number"
+                    value={shopConfig.overhead.rent}
+                    onChange={(e) => updateOverhead('rent', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="utilities">Utilities ($)</Label>
+                  <Input
+                    id="utilities"
+                    type="number"
+                    value={shopConfig.overhead.utilities}
+                    onChange={(e) => updateOverhead('utilities', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="insurance">Insurance ($)</Label>
+                  <Input
+                    id="insurance"
+                    type="number"
+                    value={shopConfig.overhead.insurance}
+                    onChange={(e) => updateOverhead('insurance', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="other">Other ($)</Label>
+                  <Input
+                    id="other"
+                    type="number"
+                    value={shopConfig.overhead.other}
+                    onChange={(e) => updateOverhead('other', e.target.value)}
                   />
                 </div>
               </div>
