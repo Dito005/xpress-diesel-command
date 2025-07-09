@@ -158,8 +158,8 @@ const Index = () => {
     }
     // Use the type guard to narrow userRole
     if (isUserRole(userRole)) {
-      // Explicitly cast tab.roles to readonly string[] for the includes method
-      return (tab.roles as readonly string[]).includes(userRole);
+      // Explicitly cast userRole to UserRole for the comparison within some
+      return tab.roles.some(role => role === (userRole as UserRole));
     }
     return false; // If userRole is a string but not a valid UserRole
   });
@@ -235,7 +235,7 @@ const Index = () => {
           </div>
         )}
 
-        <Tabs defaultValue={defaultTabValue} className="space-y-6"> {/* Fixed: Removed extra '>' */}
+        <Tabs defaultValue={defaultTabValue} className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList>
               {visibleTabs.map(tab => (
@@ -278,7 +278,7 @@ const Index = () => {
             </Tabs>
           </TabsContent>
         </Tabs>
-      </main> {/* Fixed: Added closing main tag */}
+      </main>
 
       {selectedJob && <JobDetailsModal job={selectedJob} onClose={() => setSelectedJob(null)} userRole={userRole} />}
     </div>

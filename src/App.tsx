@@ -6,23 +6,32 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import { SessionProvider, useSession } from "./components/SessionProvider"; // Import SessionProvider and useSession
+import { SessionProvider, useSession } from "./components/SessionProvider";
 
 const queryClient = new QueryClient();
 
-// PrivateRoute component to protect routes
-const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+// Component to handle routing based on session state
+const AppRoutes = () => {
   const { session, isLoading } = useSession();
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading authentication...</div>;
   }
 
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      {session ? (
+        // If session exists, allow access to dashboard and other private routes
+        <Route path="/" element={<Index />} />
+      ) : (
+        // If no session, redirect any attempt to access '/' to login
+        <Route path="/" element={<Navigate to="/login" replace />} />
+      )}
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
 };
 
 const App = () => (
@@ -32,19 +41,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <Index />
-                </PrivateRoute>
-              }
-            />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRoutes /> {/* Use the new AppRoutes component */}
         </SessionProvider>
       </BrowserRouter>
     </TooltipProvider>
