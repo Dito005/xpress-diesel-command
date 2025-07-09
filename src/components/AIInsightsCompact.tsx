@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Bot, TrendingUp, AlertTriangle, ChevronRight, Lightbulb } from "lucide-react";
 import { AdminAIInsights } from "@/components/AdminAIInsights";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const AIInsightsCompact = () => {
   const [isOpen, setIsOpen] = useState(false);

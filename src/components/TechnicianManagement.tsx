@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TechnicianForm, Technician } from "./TechnicianForm";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const TechnicianManagement = () => {
   const { toast } = useToast();
@@ -18,7 +18,7 @@ export const TechnicianManagement = () => {
     fetchTechnicians();
     const channel = supabase
       .channel('technicians_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechnicians) // Changed to 'techs'
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechnicians)
       .subscribe();
 
     return () => {
@@ -28,7 +28,7 @@ export const TechnicianManagement = () => {
 
   const fetchTechnicians = async () => {
     const { data, error } = await supabase
-      .from('techs') // Changed to 'techs'
+      .from('techs')
       .select('*');
 
     if (error) {
@@ -63,7 +63,7 @@ export const TechnicianManagement = () => {
     if (tech.id) {
       // Update existing technician
       const { error } = await supabase
-        .from('techs') // Changed to 'techs'
+        .from('techs')
         .update({
           name: tech.name,
           role: tech.role,
@@ -74,8 +74,8 @@ export const TechnicianManagement = () => {
           experience: tech.experience,
           efficiency: tech.efficiency,
           location: tech.location,
-          specialties: tech.specialties, // Ensure these are updated if form supports them
-          certifications: tech.certifications, // Ensure these are updated if form supports them
+          specialties: tech.specialties,
+          certifications: tech.certifications,
           updated_at: new Date().toISOString(),
         })
         .eq('id', tech.id);
@@ -92,7 +92,7 @@ export const TechnicianManagement = () => {
       // In a real app, you'd create the auth.user first, then insert into techs with auth.uid()
       // For now, we'll generate a dummy ID or expect it to be passed if linked to auth.signup
       const { data: newTechData, error } = await supabase
-        .from('techs') // Changed to 'techs'
+        .from('techs')
         .insert({
           // In a real app, 'id' would come from auth.uid() after user signup
           // For this demo, we'll let DB generate if not provided, or use a dummy for testing
@@ -125,7 +125,7 @@ export const TechnicianManagement = () => {
   const handleDeleteTechnician = async (techId: string, techName: string) => {
     if (window.confirm(`Are you sure you want to delete ${techName}? This action cannot be undone.`)) {
       const { error } = await supabase
-        .from('techs') // Changed to 'techs'
+        .from('techs')
         .delete()
         .eq('id', techId);
 

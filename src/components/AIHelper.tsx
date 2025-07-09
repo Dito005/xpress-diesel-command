@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bot, Send, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -92,12 +92,12 @@ export const AIHelper = () => {
             customer_info: { name: actionToConfirm.params.customerName },
             description: actionToConfirm.params.description,
             status: 'pending',
-            truck_vin: actionToConfirm.params.truckVin, // Added truck_vin
-            job_type: actionToConfirm.params.jobType, // Added job_type
-            customer_name: actionToConfirm.params.customerName, // Added customer_name
-            customer_email: actionToConfirm.params.customerEmail, // Added customer_email
-            customer_phone: actionToConfirm.params.customerPhone, // Added customer_phone
-            notes: actionToConfirm.params.notes, // Added notes
+            truck_vin: actionToConfirm.params.truckVin,
+            job_type: actionToConfirm.params.jobType,
+            customer_name: actionToConfirm.params.customerName,
+            customer_email: actionToConfirm.params.customerEmail,
+            customer_phone: actionToConfirm.params.customerPhone,
+            notes: actionToConfirm.params.notes,
           }
         ]);
         if (error) throw error;
@@ -127,7 +127,7 @@ export const AIHelper = () => {
             tech_id: techId, 
             job_id: jobId || null, 
             clock_in: new Date().toISOString(),
-            type: jobId ? 'job' : 'shift', // Differentiate between job and general shift
+            type: jobId ? 'job' : 'shift',
             notes: jobId ? `Clocked in for job ${jobId}` : 'General shift clock-in',
           }
         ]);

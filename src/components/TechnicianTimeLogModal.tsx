@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 import { useToast } from "@/hooks/use-toast";
 
 interface TimeLog {
@@ -44,7 +44,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
         *,
         jobs(description)
       `)
-      .eq('tech_id', technician.id) // Changed to 'tech_id'
+      .eq('tech_id', technician.id)
       .order('clock_in', { ascending: false });
 
     if (error) {
@@ -90,7 +90,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
     const { error } = await supabase
       .from('time_logs')
       .insert({
-        tech_id: technician.id, // Changed to 'tech_id'
+        tech_id: technician.id,
         job_id: newLog.jobId || null,
         clock_in: new Date(newLog.clockIn).toISOString(),
         clock_out: newLog.clockOut ? new Date(newLog.clockOut).toISOString() : null,

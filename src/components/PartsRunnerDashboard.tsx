@@ -4,12 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Clock, Package, MapPin, CheckCircle, AlertTriangle, Search, Truck } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-
-interface TechData {
-  id: string;
-  name: string;
-}
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const PartsRunnerDashboard = ({ onJobClick }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -29,7 +24,7 @@ export const PartsRunnerDashboard = ({ onJobClick }) => {
           status,
           customer_name,
           notes,
-          assigned_tech:techs(name)
+          job_assignments(techs(name))
         `)
         .in('status', ['waiting_parts', 'in_progress']); // Jobs that might need parts
 
@@ -39,15 +34,14 @@ export const PartsRunnerDashboard = ({ onJobClick }) => {
       }
 
       // Fetch techs for names
-      const { data, error: techsError } = await supabase
+      const { data: techsData, error: techsError } = await supabase
         .from('techs')
         .select('id, name');
       if (techsError) {
         console.error("Error fetching techs for parts runner:", techsError);
         return;
       }
-      const techsData: TechData[] = data || []; // Explicitly type data here
-      const namesMap = techsData.reduce((acc, tech) => ({ ...acc, [tech.id]: tech.name }), {});
+      const namesMap = techsData.reduce((acc, tech: { id: string; name: string }) => ({ ...acc, [tech.id]: tech.name }), {});
       setTechNames(namesMap);
 
       // Simulate parts requests from jobs
@@ -59,7 +53,7 @@ export const PartsRunnerDashboard = ({ onJobClick }) => {
         partNumber: `PN-${job.id.slice(0,4)}`, // Placeholder
         quantity: Math.floor(Math.random() * 3) + 1,
         urgency: job.priority || 'medium',
-        requestedBy: job.assigned_tech?.name || 'Unassigned',
+        requestedBy: job.job_assignments.map(assignment => assignment.techs?.name).filter(Boolean).join(', ') || 'Unassigned', // Get assigned tech from job_assignments
         supplier: "Local Supplier", // Placeholder
         estimatedCost: Math.floor(Math.random() * 300) + 50,
         status: job.status === 'waiting_parts' ? 'pending_pickup' : 'out_for_pickup', // Map job status
@@ -74,6 +68,7 @@ export const PartsRunnerDashboard = ({ onJobClick }) => {
     const channel = supabase
       .channel('parts_runner_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchPartsRequests)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, fetchPartsRequests) // Listen to assignment changes
       .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchPartsRequests)
       .subscribe();
 

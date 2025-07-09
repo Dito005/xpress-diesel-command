@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { TrendingUp, DollarSign, Clock, Users, FileText, Download, Calendar, AlertTriangle, CheckCircle } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const ReportsAnalytics = () => {
   const [dateRange, setDateRange] = useState("7days");
@@ -80,7 +80,7 @@ export const ReportsAnalytics = () => {
 
       const { data: timeLogs, error: timeLogsError } = await supabase
         .from('time_logs')
-        .select('tech_id, clock_in, clock_out, job_id, techs(name, efficiency)'); // Added job_id
+        .select('tech_id, clock_in, clock_out, job_id, techs(name, efficiency)');
       if (timeLogsError) console.error("Error fetching time logs for reports:", timeLogsError);
 
       // Calculate KPIs
@@ -92,7 +92,7 @@ export const ReportsAnalytics = () => {
         if (log.clock_in && log.clock_out) {
           const durationMs = new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime();
           totalJobDuration += durationMs;
-          if (log.job_id) completedJobsCount++; // Assuming job_id means it's a job log
+          if (log.job_id) completedJobsCount++;
         }
       });
       const avgJobTimeHours = completedJobsCount > 0 ? (totalJobDuration / completedJobsCount / 3600000).toFixed(1) : '0';
@@ -100,8 +100,8 @@ export const ReportsAnalytics = () => {
       let totalEfficiency = 0;
       let activeTechsCount = 0;
       timeLogs?.forEach(log => {
-        if (log.techs?.[0]?.efficiency) { // Access first element of array
-          totalEfficiency += log.techs[0].efficiency; // Access first element of array
+        if (log.techs?.[0]?.efficiency) {
+          totalEfficiency += log.techs[0].efficiency;
           activeTechsCount++;
         }
       });
@@ -132,8 +132,8 @@ export const ReportsAnalytics = () => {
       // Generate Technician Efficiency Data
       const techEfficiencyMap = new Map();
       timeLogs?.forEach(log => {
-        if (log.techs?.[0]) { // Check if techs array and first element exist
-          techEfficiencyMap.set(log.techs[0].name, log.techs[0].efficiency); // Access first element
+        if (log.techs?.[0]) {
+          techEfficiencyMap.set(log.techs[0].name, log.techs[0].efficiency);
         }
       });
       const techEfficiencyChartData = Array.from(techEfficiencyMap, ([name, efficiency]) => ({ name, efficiency }));
@@ -304,19 +304,19 @@ export const ReportsAnalytics = () => {
               <CardHeader>
                 <CardTitle>Job Completion Trends</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
         </TabsContent>
 
         <TabsContent value="trends" className="space-y-4">

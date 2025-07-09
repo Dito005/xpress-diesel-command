@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MapPin, Phone, Clock, Navigation, AlertTriangle, Wrench, User } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const RoadServiceDashboard = ({ onJobClick }) => {
   const [roadCalls, setRoadCalls] = useState([]);
@@ -16,7 +16,7 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
         .from('jobs')
         .select(`
           *,
-          assigned_tech:techs(name)
+          job_assignments(techs(name))
         `)
         .eq('job_type', 'Road Service')
         .in('status', ['open', 'in_progress']);
@@ -34,7 +34,7 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
         console.error("Error fetching techs for road service:", techsError);
         return;
       }
-      const namesMap = techsData.reduce((acc, tech) => ({ ...acc, [tech.id]: tech.name }), {});
+      const namesMap = techsData.reduce((acc, tech: { id: string; name: string }) => ({ ...acc, [tech.id]: tech.name }), {});
       setTechNames(namesMap);
 
       // Simulate additional road call data
@@ -42,16 +42,16 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
         id: job.id,
         callNumber: `RS-${job.created_at.substring(0, 4)}-${job.truck_vin?.slice(-4) || job.id.slice(0,4)}`,
         customerName: job.customer_name,
-        driverName: job.customer_info?.driver_name || 'N/A', // Assuming driver_name might be in customer_info
+        driverName: job.customer_info?.driver_name || 'N/A',
         driverPhone: job.customer_phone || 'N/A',
         unitNumber: job.truck_vin || 'N/A',
-        location: job.location || 'Unknown Location', // Assuming location exists
+        location: job.location || 'Unknown Location',
         coordinates: { lat: 40.7128, lng: -74.0060 }, // Placeholder
         issue: job.customer_concern || job.notes || 'No specific issue described',
         priority: job.priority || 'medium',
         status: job.status === 'in_progress' ? 'en_route' : 'assigned', // Map job status to road call status
         estimatedArrival: "25 minutes", // Placeholder
-        assignedTech: job.assigned_tech?.name || 'Unassigned',
+        assignedTech: job.job_assignments.map(assignment => assignment.techs?.name).filter(Boolean).join(', ') || 'Unassigned', // Get assigned tech from job_assignments
         callTime: "15 minutes ago", // Placeholder
         customerType: "Standard" // Placeholder
       }));
@@ -63,6 +63,7 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
     const channel = supabase
       .channel('road_service_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchRoadCalls)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, fetchRoadCalls) // Listen to assignment changes
       .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchRoadCalls)
       .subscribe();
 
@@ -148,87 +149,88 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
         </Card>
       </div>
 
-      {/* Active Road Calls */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Active Road Calls ({roadCalls.length})
-          </h3>
-          <Button className="bg-red-600 hover:bg-red-700">
-            Emergency Dispatch
-          </Button>
+      {/* Search and Filter */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Search parts or unit numbers..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
         </div>
+        <Button variant="outline">
+          <MapPin className="h-4 w-4 mr-2" />
+          Route Optimizer
+        </Button>
+      </div>
+
+      {/* Parts Requests */}
+      <div className="space-y-4">
+        <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+          <Package className="h-5 w-5" />
+          Parts Requests ({filteredRequests.length})
+        </h3>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {roadCalls.map((call) => (
-            <Card key={call.id} className="hover:shadow-lg transition-shadow border-l-4 border-l-red-500">
+          {filteredRequests.map((request) => (
+            <Card key={request.id} className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    {call.callNumber}
-                    {call.priority === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                    {request.unitNumber}
+                    {request.urgency === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
                   </CardTitle>
                   <div className="flex gap-2">
-                    <Badge className={getPriorityColor(call.priority)} variant="outline">
-                      {call.priority.toUpperCase()}
+                    <Badge className={getUrgencyColor(request.urgency)} variant="outline">
+                      {request.urgency.toUpperCase()}
                     </Badge>
-                    <Badge className={getStatusColor(call.status)} variant="outline">
-                      {call.status === "assigned" ? "Assigned" :
-                       call.status === "en_route" ? "En Route" :
-                       call.status === "on_site" ? "On Site" : "Completed"}
+                    <Badge className={getStatusColor(request.status)} variant="outline">
+                      {request.status === "pending_pickup" ? "Pending" :
+                       request.status === "out_for_pickup" ? "En Route" : "Delivered"}
                     </Badge>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <div className="font-medium text-gray-900">{call.customerName}</div>
-                  <div className="text-sm text-gray-600">{call.customerType} Customer</div>
-                  <div className="text-sm text-gray-600">Unit: {call.unitNumber}</div>
-                </div>
-
-                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                  <div className="text-sm font-medium text-red-800">Issue Description:</div>
-                  <div className="text-sm text-red-700">{call.issue}</div>
-                </div>
-
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="h-4 w-4" />
-                  {call.location}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="text-gray-600">Driver:</div>
-                    <div className="font-medium">{call.driverName}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-600">Tech Assigned:</div>
-                    <div className="font-medium">{call.assignedTech || 'Unassigned'}</div>
-                  </div>
+                  <div className="font-medium text-gray-900">{request.partName}</div>
+                  <div className="text-sm text-gray-600">Part #: {request.partNumber}</div>
+                  <div className="text-sm text-gray-600">Qty: {request.quantity}</div>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-gray-600">
-                    Called {call.callTime}
+                    Requested by: <span className="font-medium">{request.requestedBy}</span>
                   </div>
-                  <div className="font-medium text-blue-600">
-                    ETA: {call.estimatedArrival}
+                  <div className="font-medium text-green-600">
+                    ${request.estimatedCost}
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <MapPin className="h-4 w-4" />
+                  {request.supplier} - {request.location}
+                </div>
+
+                <div className="text-xs text-gray-500">
+                  Requested {request.requestTime}
+                </div>
+
                 <div className="flex gap-2 pt-2">
-                  <Button size="sm" variant="outline" className="flex items-center gap-1">
-                    <Phone className="h-3 w-3" />
-                    Call Driver
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex items-center gap-1">
-                    <Navigation className="h-3 w-3" />
-                    Directions
-                  </Button>
-                  <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700">
-                    Update Status
+                  {request.status === "pending_pickup" && (
+                    <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700">
+                      Start Pickup
+                    </Button>
+                  )}
+                  {request.status === "out_for_pickup" && (
+                    <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700">
+                      Mark Delivered
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => onJobClick({ id: request.jobId })}>
+                    View Job
                   </Button>
                 </div>
               </CardContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 const fetchVehicleDataFromVIN = async (vin: string) => {
@@ -38,16 +38,18 @@ const formSchema = z.object({
   customerEmail: z.string().email("Invalid email address").optional().or(z.literal('')),
   customerPhone: z.string().min(1, "Customer phone is required"),
   jobType: z.string().min(1, "Job type is required"),
-  customerConcern: z.string().min(10, "Please provide a detailed customer concern"), // New field
-  recommendedService: z.string().optional(), // New field
-  actualService: z.string().optional(), // New field
-  notes: z.string().optional(), // Renamed from notes to customerConcern, keeping notes for general use
+  customerConcern: z.string().min(10, "Please provide a detailed customer concern"),
+  recommendedService: z.string().optional(),
+  actualService: z.string().optional(),
+  notes: z.string().optional(),
+  assignedTechId: z.string().optional(), // New field for tech assignment
 });
 
 export const NewJobForm = () => {
   const { toast } = useToast();
   const [isVinLoading, setIsVinLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [techs, setTechs] = useState([]); // State to hold available technicians
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -60,12 +62,27 @@ export const NewJobForm = () => {
       customerEmail: "",
       customerPhone: "",
       jobType: "",
-      customerConcern: "", // Default for new field
-      recommendedService: "", // Default for new field
-      actualService: "", // Default for new field
+      customerConcern: "",
+      recommendedService: "",
+      actualService: "",
       notes: "",
+      assignedTechId: "", // Default for new field
     },
   });
+
+  useEffect(() => {
+    const fetchTechs = async () => {
+      const { data, error } = await supabase
+        .from('techs')
+        .select('id, name');
+      if (error) {
+        console.error("Error fetching technicians:", error);
+      } else {
+        setTechs(data);
+      }
+    };
+    fetchTechs();
+  }, []);
 
   const handleVinLookup = async () => {
     const vin = form.getValues("truckVin");
@@ -105,39 +122,65 @@ export const NewJobForm = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     
-    const { error } = await supabase.from('jobs').insert([
+    const { data: jobData, error: jobError } = await supabase.from('jobs').insert([
       { 
         truck_vin: values.truckVin,
         customer_name: values.customerName,
         customer_email: values.customerEmail,
         customer_phone: values.customerPhone,
         job_type: values.jobType,
-        notes: values.notes, // General notes
-        customer_concern: values.customerConcern, // New field
-        recommended_service: values.recommendedService, // New field
-        actual_service: values.actualService, // New field
-        status: 'open', // Default status for new jobs
-        customer_info: { // Store vehicle info in customer_info JSONB
+        notes: values.notes,
+        customer_concern: values.customerConcern,
+        recommended_service: values.recommendedService,
+        actual_service: values.actualService,
+        status: 'open',
+        customer_info: {
           make: values.make,
           model: values.model,
           year: values.year,
         },
       }
-    ]);
+    ]).select().single();
 
-    if (error) {
+    if (jobError) {
       toast({
         variant: "destructive",
         title: "Failed to create job",
-        description: error.message,
+        description: jobError.message,
       });
-    } else {
-      toast({
-        title: "Job Created Successfully",
-        description: `A new job for ${values.customerName} has been added to the board.`,
-      });
-      form.reset();
+      setIsSubmitting(false);
+      return;
     }
+
+    // If a technician is assigned, create a job_assignment entry
+    if (values.assignedTechId && jobData?.id) {
+      const { error: assignmentError } = await supabase.from('job_assignments').insert([
+        {
+          job_id: jobData.id,
+          tech_id: values.assignedTechId,
+        }
+      ]);
+
+      if (assignmentError) {
+        toast({
+          variant: "destructive",
+          title: "Failed to assign technician",
+          description: assignmentError.message,
+        });
+        // Optionally, you might want to delete the job if assignment fails critically
+      } else {
+        toast({
+          title: "Technician Assigned",
+          description: `Job assigned to selected technician.`,
+        });
+      }
+    }
+
+    toast({
+      title: "Job Created Successfully",
+      description: `A new job for ${values.customerName} has been added to the board.`,
+    });
+    form.reset();
     setIsSubmitting(false);
   };
 
@@ -271,6 +314,29 @@ export const NewJobForm = () => {
                       <SelectItem value="Road Service">Road Service</SelectItem>
                       <SelectItem value="Diagnostic">Diagnostic</SelectItem>
                       <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="assignedTechId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assign Technician (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select technician" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">Unassigned</SelectItem>
+                      {techs.map(tech => (
+                        <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

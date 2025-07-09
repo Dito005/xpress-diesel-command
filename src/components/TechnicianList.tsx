@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users, Activity, MapPin, Edit } from "lucide-react";
 import { TechnicianTimeLogModal } from "./TechnicianTimeLogModal";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 interface Technician {
   id: string;
@@ -33,7 +33,7 @@ export const TechnicianList = () => {
     fetchTechnicians();
     const channel = supabase
       .channel('technician_list_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechnicians) // Changed to 'techs'
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechnicians)
       .subscribe();
 
     return () => {
@@ -43,7 +43,7 @@ export const TechnicianList = () => {
 
   const fetchTechnicians = async () => {
     const { data, error } = await supabase
-      .from('techs') // Changed to 'techs'
+      .from('techs')
       .select('*');
 
     if (error) {
@@ -52,9 +52,9 @@ export const TechnicianList = () => {
       // Add mock current_activity and status for display purposes if not in DB
       const enrichedData = data.map(tech => ({
         ...tech,
-        current_activity: tech.current_activity || "Idle", // Assuming current_activity might be a DB column
-        status: tech.status || (tech.active ? 'active' : 'offline'), // Assuming status might be a DB column
-        hourly_rate: tech.hourly_rate || 0, // Ensure hourly_rate exists
+        current_activity: tech.current_activity || "Idle",
+        status: tech.status || (tech.active ? 'active' : 'offline'),
+        hourly_rate: tech.hourly_rate || 0,
       }));
       setTechnicians(enrichedData as Technician[]);
     }

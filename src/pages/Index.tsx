@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, DollarSign, Users, Wrench, MapPin, Plus, Bot, Package, FileText, Calculator, Settings, Database, Brain, Workflow, AlertTriangle, BarChart, Search } from "lucide-react";
+import { Clock, DollarSign, Users, Wrench, MapPin, Plus, Bot, Package, FileText, Calculator, Settings, Database, Brain, Workflow, AlertTriangle, BarChart, Search, LogOut } from "lucide-react";
 import { JobBoard } from "@/components/JobBoard";
 import { TechnicianDashboard } from "@/components/TechnicianDashboard";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
@@ -19,13 +19,16 @@ import { BusinessCosts } from "@/components/BusinessCosts";
 import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
 import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
 import { PartsLookupTool } from "@/components/PartsLookupTool";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { useSession } from "@/components/SessionProvider"; // Import useSession
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
-type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts";
+type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts" | "unassigned";
 
 const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
-  const [userRole, setUserRole] = useState<UserRole>("admin");
+  const { userRole, session } = useSession(); // Get userRole and session from context
   const [liveLaborCost, setLiveLaborCost] = useState(0);
   const [kpiData, setKpiData] = useState({
     pendingJobs: 0,
@@ -33,8 +36,12 @@ const Index = () => {
     activeJobs: 0,
     efficiency: 0,
   });
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
+    if (!session) return; // Only fetch KPIs if session exists
+
     const fetchKpis = async () => {
       // Fetch jobs for pending/active counts
       const { data: jobs, error: jobsError } = await supabase.from('jobs').select('status');
@@ -44,13 +51,13 @@ const Index = () => {
       const today = new Date().toISOString().split('T')[0];
       const { data: invoices, error: invoicesError } = await supabase
         .from('invoices')
-        .select('total') // Changed from 'amount' to 'total'
+        .select('total')
         .gte('created_at', `${today}T00:00:00.000Z`);
       if (invoicesError) console.error('Error fetching invoices for KPIs', invoicesError);
 
       const pendingJobs = jobs?.filter(j => j.status === 'pending' || j.status === 'waiting_parts').length || 0;
       const activeJobs = jobs?.filter(j => j.status === 'in_progress').length || 0;
-      const todaysProfit = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0; // Changed from 'amount' to 'total'
+      const todaysProfit = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0;
 
       setKpiData(prev => ({ ...prev, pendingJobs, activeJobs, todaysProfit }));
     };
@@ -58,9 +65,9 @@ const Index = () => {
     const calculateLaborCost = async () => {
         const { data: clockedInTechs, error } = await supabase
             .from('time_logs')
-            .select('techs(hourly_rate)') // Changed to 'techs'
+            .select('techs(hourly_rate)')
             .is('clock_out', null)
-            .eq('type', 'shift'); // Only count general shift logs
+            .eq('type', 'shift');
 
         if (error) {
             console.error("Error fetching clocked in techs:", error);
@@ -68,12 +75,11 @@ const Index = () => {
         }
 
         const totalHourlyRate = clockedInTechs.reduce((sum, log) => {
-            const techProfile = log.techs?.[0]; // Access the first element of the array
+            const techProfile = log.techs?.[0];
             return sum + (techProfile?.hourly_rate || 0);
         }, 0);
         return totalHourlyRate;
     };
-
 
     fetchKpis();
     
@@ -83,28 +89,46 @@ const Index = () => {
         setLiveLaborCost(prev => prev + costPerSecond);
     }, 1000);
 
-    const kpiInterval = setInterval(fetchKpis, 30000); // Refresh KPIs every 30 seconds
+    const kpiInterval = setInterval(fetchKpis, 30000);
 
     return () => {
       clearInterval(laborInterval);
       clearInterval(kpiInterval);
     };
-  }, []);
+  }, [session]); // Re-run effect when session changes
 
   const handleJobClick = (job) => {
     setSelectedJob(job);
   };
 
-  const availableRoles: UserRole[] = ["admin", "manager", "mechanic", "road", "parts"];
-  const getRoleLabel = (role: UserRole) => {
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Logout Failed",
+        description: error.message,
+      });
+    } else {
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+      });
+      navigate('/login');
+    }
+  };
+
+  const getRoleLabel = (role: UserRole | null) => {
+    if (!role) return "Loading...";
     const labels: Record<UserRole, string> = {
       admin: "Administrator",
       manager: "Service Manager",
       mechanic: "Technician",
       road: "Road Tech",
       parts: "Parts Runner",
+      unassigned: "Unassigned Role",
     };
-    return labels[role];
+    return labels[role] || "Unknown Role";
   };
 
   const TABS_CONFIG: { value: string; label: string; icon: React.ElementType; roles: UserRole[] }[] = [
@@ -121,7 +145,8 @@ const Index = () => {
     { value: "settings", label: "Settings", icon: Settings, roles: ["admin"] },
   ];
 
-  const visibleTabs = TABS_CONFIG.filter(tab => tab.roles.includes(userRole));
+  const visibleTabs = TABS_CONFIG.filter(tab => userRole && tab.roles.includes(userRole));
+  const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs"; // Fallback to 'jobs' if no specific role tabs
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -130,18 +155,17 @@ const Index = () => {
           <div className="flex justify-between items-center h-16">
             <div className="text-center">
               <h1 className="text-xl font-bold text-gray-900">Xpress Diesel Repair</h1>
-              <p className="text-sm font-medium text-blue-600 -mt-1">Software</p>
+              <p className="text-sm font-medium text-blue-600 -mt-1">Command Center</p>
             </div>
             <div className="flex items-center space-x-4">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                {getRoleLabel(userRole)}
-              </Badge>
-              <Button variant="outline" size="sm" onClick={() => {
-                const currentIndex = availableRoles.indexOf(userRole);
-                const nextRole = availableRoles[(currentIndex + 1) % availableRoles.length];
-                setUserRole(nextRole);
-              }}>
-                Switch Role
+              {userRole && (
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  {getRoleLabel(userRole)}
+                </Badge>
+              )}
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
               </Button>
             </div>
           </div>
@@ -194,7 +218,7 @@ const Index = () => {
           </div>
         )}
 
-        <Tabs defaultValue={visibleTabs[0].value} className="space-y-6">
+        <Tabs defaultValue={defaultTabValue} className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList>
               {visibleTabs.map(tab => (

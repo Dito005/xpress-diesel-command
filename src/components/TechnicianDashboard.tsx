@@ -3,37 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Play, Pause, CheckCircle, User, Wrench } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/components/SessionProvider"; // Import useSession
 
 export const TechnicianDashboard = ({ userRole, onJobClick }) => {
   const { toast } = useToast();
   const [technicianJobs, setTechnicianJobs] = useState([]);
   const [currentShiftLog, setCurrentShiftLog] = useState(null);
   const [currentJobLog, setCurrentJobLog] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null); // This will be auth.uid()
+  const { session } = useSession(); // Get session from context
   const [currentTechId, setCurrentTechId] = useState(null); // This will be the ID from public.techs
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-        // Fetch the corresponding tech_id from the public.techs table
-        const { data: techData, error: techError } = await supabase
-          .from('techs')
-          .select('id')
-          .eq('id', user.id) // Assuming auth.uid() is directly used as id in public.techs
-          .single();
+      if (!session?.user?.id) return;
 
-        if (techError) {
-          console.error("Error fetching tech ID:", techError);
-          toast({ variant: "destructive", title: "Error", description: "Could not find technician profile." });
-        } else if (techData) {
-          setCurrentTechId(techData.id);
-          fetchTechnicianData(techData.id);
-        }
-      }
+      setCurrentTechId(session.user.id); // Assuming auth.uid() is directly used as id in public.techs
+      fetchTechnicianData(session.user.id);
     };
     fetchUserData();
 
@@ -49,37 +36,43 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
           fetchTechnicianData(currentTechId);
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, payload => { // Listen to assignment changes
+        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+          fetchTechnicianData(currentTechId);
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentTechId]); // Depend on currentTechId
+  }, [session, currentTechId]); // Depend on session and currentTechId
 
   const fetchTechnicianData = async (techId) => {
     if (!techId) return;
 
-    // Fetch assigned jobs
-    const { data: jobsData, error: jobsError } = await supabase
-      .from('jobs')
+    // Fetch assigned jobs via job_assignments
+    const { data: assignmentsData, error: assignmentsError } = await supabase
+      .from('job_assignments')
       .select(`
-        *,
-        assigned_tech:techs(name)
+        job_id,
+        jobs(*)
       `)
-      .eq('assigned_tech', techId) // Changed to 'assigned_tech'
-      .in('status', ['pending', 'in_progress']);
+      .eq('tech_id', techId);
 
-    if (jobsError) {
-      console.error("Error fetching technician jobs:", jobsError);
+    if (assignmentsError) {
+      console.error("Error fetching technician assignments:", assignmentsError);
     } else {
-      setTechnicianJobs(jobsData);
+      // Extract job details from the nested 'jobs' object
+      const assignedJobs = assignmentsData.map(assignment => assignment.jobs).filter(Boolean);
+      setTechnicianJobs(assignedJobs);
     }
 
     // Fetch current shift log
     const { data: shiftLog, error: shiftError } = await supabase
       .from('time_logs')
       .select('*')
-      .eq('tech_id', techId) // Changed to 'tech_id'
+      .eq('tech_id', techId)
       .is('clock_out', null)
       .is('job_id', null) // General shift
       .single();
@@ -94,7 +87,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     const { data: jobLog, error: jobLogError } = await supabase
       .from('time_logs')
       .select('*')
-      .eq('tech_id', techId) // Changed to 'tech_id'
+      .eq('tech_id', techId)
       .is('clock_out', null)
       .not('job_id', 'is', null) // Specific job
       .single();
@@ -129,7 +122,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       // Clock in
       const { error } = await supabase
         .from('time_logs')
-        .insert({ tech_id: currentTechId, clock_in: new Date().toISOString(), type: 'shift' }); // Changed to 'tech_id' and added 'type'
+        .insert({ tech_id: currentTechId, clock_in: new Date().toISOString(), type: 'shift' });
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in." });
@@ -158,7 +151,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       } else {
         toast({ title: "Job Clocked Out", description: "You have clocked out of the job." });
         setCurrentJobLog(null);
-        fetchTechnicianData(currentTechId);
+        // Optionally update job status to 'paused' or similar
       }
     } else {
       // Clock in to new job (and clock out of any other job if active)
@@ -171,7 +164,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
 
       const { error } = await supabase
         .from('time_logs')
-        .insert({ tech_id: currentTechId, job_id: jobId, clock_in: new Date().toISOString(), type: 'job' }); // Changed to 'tech_id' and added 'type'
+        .insert({ tech_id: currentTechId, job_id: jobId, clock_in: new Date().toISOString(), type: 'job' });
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });

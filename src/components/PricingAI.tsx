@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot, TrendingUp, DollarSign, Calculator, Lightbulb, CheckCircle, AlertTriangle } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const PricingAI = () => {
   const [jobType, setJobType] = useState("");
@@ -22,7 +22,7 @@ export const PricingAI = () => {
     const fetchTechs = async () => {
       const { data, error } = await supabase
         .from('techs')
-        .select('id, name, hourly_rate, efficiency, efficiency_by_type'); // Fetch relevant tech data
+        .select('id, name, hourly_rate, efficiency, efficiency_by_type');
       if (error) {
         console.error("Error fetching techs for Pricing AI:", error);
       } else {

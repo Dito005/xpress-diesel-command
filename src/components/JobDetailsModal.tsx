@@ -5,53 +5,54 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Clock, DollarSign, User, Truck, FileText, Camera, Save, Play, Pause } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/components/SessionProvider"; // Import useSession
 
 export const JobDetailsModal = ({ job, onClose, userRole }) => {
   const { toast } = useToast();
   const [notes, setNotes] = useState(job?.notes || "");
   const [jobStatus, setJobStatus] = useState(job?.status || "open"); // Default to 'open'
   const [currentJobTimeLog, setCurrentJobTimeLog] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null); // This will be auth.uid()
+  const { session } = useSession(); // Get session from context
   const [currentTechId, setCurrentTechId] = useState(null); // This will be the ID from public.techs
+  const [assignedTechNames, setAssignedTechNames] = useState(''); // State for assigned tech names
 
   useEffect(() => {
     const fetchUserAndLog = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-        // Fetch the corresponding tech_id from the public.techs table
-        const { data: techData, error: techError } = await supabase
-          .from('techs')
-          .select('id')
-          .eq('id', user.id) // Assuming auth.uid() is directly used as id in public.techs
-          .single();
+      if (!session?.user?.id) return;
 
-        if (techError) {
-          console.error("Error fetching tech ID:", techError);
-          // Don't toast here, as it might be a non-mechanic user
-        } else if (techData) {
-          setCurrentTechId(techData.id);
-          if (job?.id) {
-            const { data: log, error } = await supabase
-              .from('time_logs')
-              .select('*')
-              .eq('tech_id', techData.id) // Changed to 'tech_id'
-              .eq('job_id', job.id)
-              .is('clock_out', null)
-              .single();
-            if (error && error.code !== 'PGRST116') {
-              console.error("Error fetching current job time log:", error);
-            } else {
-              setCurrentJobTimeLog(log);
-            }
-          }
+      setCurrentTechId(session.user.id);
+      if (job?.id) {
+        const { data: log, error } = await supabase
+          .from('time_logs')
+          .select('*')
+          .eq('tech_id', session.user.id)
+          .eq('job_id', job.id)
+          .is('clock_out', null)
+          .single();
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error fetching current job time log:", error);
+        } else {
+          setCurrentJobTimeLog(log);
+        }
+
+        // Fetch assigned technicians for this job
+        const { data: assignments, error: assignError } = await supabase
+          .from('job_assignments')
+          .select('techs(name)')
+          .eq('job_id', job.id);
+
+        if (assignError) {
+          console.error("Error fetching job assignments:", assignError);
+        } else {
+          const names = assignments.map(assign => assign.techs?.name).filter(Boolean).join(', ');
+          setAssignedTechNames(names);
         }
       }
     };
     fetchUserAndLog();
-  }, [job?.id]);
+  }, [job?.id, session]);
 
   if (!job) return null;
 
@@ -96,7 +97,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
       // Clock in
       const { error } = await supabase
         .from('time_logs')
-        .insert({ tech_id: currentTechId, job_id: job.id, clock_in: new Date().toISOString(), type: 'job' }); // Changed to 'tech_id' and added 'type'
+        .insert({ tech_id: currentTechId, job_id: job.id, clock_in: new Date().toISOString(), type: 'job' });
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
@@ -106,7 +107,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         const { data: newLog } = await supabase
           .from('time_logs')
           .select('*')
-          .eq('tech_id', currentTechId) // Changed to 'tech_id'
+          .eq('tech_id', currentTechId)
           .eq('job_id', job.id)
           .is('clock_out', null)
           .single();
@@ -193,7 +194,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">Assigned to:</span>
-                  <span className="font-medium">{job.assigned_tech?.name || 'Unassigned'}</span>
+                  <span className="font-medium">{assignedTechNames || 'Unassigned'}</span>
                 </div>
               </CardContent>
             </Card>

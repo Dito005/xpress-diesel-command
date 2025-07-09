@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Brain, Clock, Wrench, Package, AlertTriangle, CheckCircle, Users, MapPin, GraduationCap } from "lucide-react";
-import { supabase } from "@/lib/supabase"; // Import supabase
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 // Enhanced data structures
 interface TechnicianSkill {
@@ -44,7 +44,7 @@ export const AIJobAnalyzer = () => {
       // Fetch technicians from the 'techs' table
       const { data: techsData, error: techsError } = await supabase
         .from('techs')
-        .select('id, name, efficiency_by_type, is_available'); // Assuming efficiency_by_type and is_available exist
+        .select('id, name, efficiency_by_type, is_available');
 
       if (techsError) {
         console.error("Error fetching technicians for AI Analyzer:", techsError);
@@ -54,8 +54,8 @@ export const AIJobAnalyzer = () => {
       const mappedTechs: TechnicianSkill[] = techsData.map(tech => ({
         id: tech.id,
         name: tech.name,
-        skills: tech.efficiency_by_type || {}, // Map efficiency_by_type to skills
-        availability: tech.is_available ? 'available' : 'busy', // Map is_available to availability
+        skills: tech.efficiency_by_type || {},
+        availability: tech.is_available ? 'available' : 'busy',
         currentLoad: 0, // Placeholder, would need to fetch from jobs/time_logs
         trainingNeeds: [], // Placeholder
       }));
@@ -64,7 +64,7 @@ export const AIJobAnalyzer = () => {
       // Fetch open jobs from the 'jobs' table
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select('id, truck_vin, job_type, priority, customer_concern'); // Assuming these columns exist
+        .select('id, truck_vin, job_type, priority, customer_concern');
 
       if (jobsError) {
         console.error("Error fetching jobs for AI Analyzer:", jobsError);

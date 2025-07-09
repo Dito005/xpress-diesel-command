@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bot, TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign, Users, Wrench, Lightbulb, Target } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const AdminAIInsights = () => {
   const [insights, setInsights] = useState([]);

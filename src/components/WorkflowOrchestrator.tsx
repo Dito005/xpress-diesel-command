@@ -19,7 +19,7 @@ import {
   PlayCircle,
   PauseCircle
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 interface SetupRequirement {
   id: string;

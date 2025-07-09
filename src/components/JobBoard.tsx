@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Clock, DollarSign, User, AlertTriangle, Plus } from "lucide-react";
 import { NewJobForm } from "./NewJobForm";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const JobBoard = ({ onJobClick }) => {
   const [jobs, setJobs] = useState([]);
@@ -16,13 +16,18 @@ export const JobBoard = ({ onJobClick }) => {
         .from('jobs')
         .select(`
           *,
-          assigned_tech:techs ( name )
+          job_assignments(techs(name))
         `);
       
       if (error) {
         console.error("Error fetching jobs:", error);
       } else {
-        setJobs(data);
+        // Flatten the job_assignments array to get assigned tech names
+        const jobsWithAssignedTechs = data.map(job => ({
+          ...job,
+          assigned_tech_names: job.job_assignments.map(assignment => assignment.techs?.name).filter(Boolean).join(', ')
+        }));
+        setJobs(jobsWithAssignedTechs);
       }
     };
 
@@ -31,6 +36,7 @@ export const JobBoard = ({ onJobClick }) => {
     const channel = supabase
       .channel('realtime jobs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchJobs)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, fetchJobs) // Listen to assignment changes
       .subscribe();
 
     return () => {
@@ -113,7 +119,7 @@ export const JobBoard = ({ onJobClick }) => {
                     
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <User className="h-3 w-3" />
-                      {job.assigned_tech?.name || 'Unassigned'}
+                      {job.assigned_tech_names || 'Unassigned'}
                     </div>
                     
                     <div className="text-xs text-gray-500 line-clamp-2">
