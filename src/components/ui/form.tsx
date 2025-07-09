@@ -3,7 +3,14 @@
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
 import { Slot } from "@radix-ui/react-slot"
-import { Controller, FormProvider, useFormContext } from "react-hook-form"
+import {
+  Controller,
+  ControllerProps, // Added import
+  FieldPath,      // Added import
+  FieldValues,    // Added import
+  FormProvider,
+  useFormContext,
+} from "react-hook-form"
 
 import { cn } from "@/lib/utils"
 
@@ -74,7 +81,7 @@ const FormLabel = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
 >(({ className, ...props }, ref) => {
-  const { error, formItemId } = useFormField()
+  const { error, formItemId } = useFormField() // Destructure error here
 
   return (
     <LabelPrimitive.Root
@@ -95,7 +102,7 @@ const FormControl = React.forwardRef<
   React.ElementRef<typeof Slot>,
   React.ComponentPropsWithoutRef<typeof Slot>
 >(({ ...props }, ref) => {
-  const { formItemId, formDescriptionId, formMessageId } = useFormField()
+  const { formItemId, formDescriptionId, formMessageId, error } = useFormField() // Destructure error here
 
   return (
     <Slot
