@@ -9,31 +9,7 @@ import { TechnicianDashboard } from "@/components/TechnicianDashboard";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { PartsRunnerDashboard } from "@/components/PartsRunnerDashboard";
 import { RoadServiceDashboard } from "@/components/RoadServiceDashboard";
-import { ReportsAnalytics } from "@/components/ReportsAnalytics";
-import { AIHelper } from "@/components/AIHelper";
-import { InvoicingSystem } from "@/components/InvoicingSystem";
-import { ShopSettings } from "@/components/ShopSettings";
-import { TechnicianManagement } from "@/components/TechnicianManagement";
-import { TechnicianList } from "@/components/TechnicianList";
-import { BusinessCosts } from "@/components/BusinessCosts";
-import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
-import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
-import { PartsLookupTool } from "@/components/PartsLookupTool"; // Corrected import statement
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
-import { useSession } from "@/components/SessionProvider"; // Import useSession
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-
-type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts" | "unassigned";
-
-// Type guard function to check if a string is a valid UserRole
-function isUserRole(role: string | null): role is UserRole {
-  if (role === null) return false;
-  const validRoles: UserRole[] = ["admin", "manager", "mechanic", "road", "parts", "unassigned"];
-  return (validRoles as string[]).includes(role);
-}
-
-const Index = () => {
+import { ReportsAnalytics } => {
   const [selectedJob, setSelectedJob] = useState(null);
   const { userRole, session } = useSession(); // Get userRole and session from context
   const [liveLaborCost, setLiveLaborCost] = useState(0);
@@ -153,15 +129,9 @@ const Index = () => {
   ];
 
   const visibleTabs = TABS_CONFIG.filter(tab => {
-    if (!userRole) {
-      return false;
-    }
-    // Apply the type guard here. If true, userRole is now narrowed to UserRole within this block.
-    if (isUserRole(userRole)) {
-      // Now, userRole is correctly inferred as UserRole, so direct comparison is fine.
-      return tab.roles.some(role => role === userRole);
-    }
-    return false; // If userRole is a string but not a valid UserRole
+    // If userRole is null, filter it out. Otherwise, check if the tab's roles include the user's role.
+    // We cast tab.roles to string[] to satisfy TypeScript's strictness with includes on literal types.
+    return userRole !== null && (tab.roles as string[]).includes(userRole);
   });
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
 

@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 const fetchVehicleDataFromVIN = async (vin: string) => {
@@ -152,8 +152,8 @@ export const NewJobForm = () => {
       return;
     }
 
-    // If a technician is assigned, create a job_assignment entry
-    if (values.assignedTechId && jobData?.id) {
+    // If a technician is assigned (and not the "unassigned" placeholder), create a job_assignment entry
+    if (values.assignedTechId && values.assignedTechId !== "unassigned" && jobData?.id) {
       const { error: assignmentError } = await supabase.from('job_assignments').insert([
         {
           job_id: jobData.id,
@@ -333,7 +333,7 @@ export const NewJobForm = () => {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem> {/* Changed value from "" to "unassigned" */}
                       {techs.map(tech => (
                         <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
                       ))}
