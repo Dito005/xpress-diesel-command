@@ -19,50 +19,77 @@ import { BusinessCosts } from "@/components/BusinessCosts";
 import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
 import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
 import { PartsLookupTool } from "@/components/PartsLookupTool";
+import { supabase } from "@/lib/supabase";
 
 type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts";
 
 const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [userRole, setUserRole] = useState<UserRole>("admin");
-  const [liveLaborCost, setLiveLaborCost] = useState(125.50);
-  const [todaysProfit, setTodaysProfit] = useState(8430.25);
-
-  // Mock data for demonstration
-  const jobsData = [
-    { status: "not_started" }, { status: "in_progress" }, { status: "waiting_parts" },
-    { status: "waiting_approval" }, { status: "in_progress" }, { status: "completed" }
-  ];
-  const clockedInTechs = [
-    { name: "Mike Rodriguez", hourlyRate: 35 },
-    { name: "Sarah Johnson", hourlyRate: 28 },
-    { name: "Carlos Martinez", hourlyRate: 22 },
-  ];
+  const [liveLaborCost, setLiveLaborCost] = useState(0);
+  const [kpiData, setKpiData] = useState({
+    pendingJobs: 0,
+    todaysProfit: 0,
+    activeJobs: 0,
+    efficiency: 0,
+  });
 
   useEffect(() => {
-    const totalHourlyRate = clockedInTechs.reduce((sum, tech) => sum + tech.hourlyRate, 0);
-    const costPerSecond = totalHourlyRate / 3600;
+    const fetchKpis = async () => {
+      // Fetch jobs for pending/active counts
+      const { data: jobs, error: jobsError } = await supabase.from('jobs').select('status');
+      if (jobsError) console.error('Error fetching jobs for KPIs', jobsError);
 
-    const laborInterval = setInterval(() => {
-      setLiveLaborCost(prevCost => prevCost + costPerSecond);
+      // Fetch invoices for profit calculation
+      const today = new Date().toISOString().split('T')[0];
+      const { data: invoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('amount')
+        .gte('created_at', `${today}T00:00:00.000Z`);
+      if (invoicesError) console.error('Error fetching invoices for KPIs', invoicesError);
+
+      const pendingJobs = jobs?.filter(j => j.status === 'pending' || j.status === 'waiting_parts').length || 0;
+      const activeJobs = jobs?.filter(j => j.status === 'in_progress').length || 0;
+      const todaysProfit = invoices?.reduce((sum, inv) => sum + inv.amount, 0) || 0;
+
+      setKpiData(prev => ({ ...prev, pendingJobs, activeJobs, todaysProfit }));
+    };
+
+    const calculateLaborCost = async () => {
+        const { data: clockedInTechs, error } = await supabase
+            .from('time_logs')
+            .select('users(hourly_rate)')
+            .is('clock_out', null);
+
+        if (error) {
+            console.error("Error fetching clocked in techs:", error);
+            return 0;
+        }
+
+        const totalHourlyRate = clockedInTechs.reduce((sum, log) => {
+            // The 'users' property is inferred as an array, so we access the first element.
+            const userProfile = log.users?.[0];
+            return sum + (userProfile?.hourly_rate || 0);
+        }, 0);
+        return totalHourlyRate;
+    };
+
+
+    fetchKpis();
+    
+    const laborInterval = setInterval(async () => {
+        const totalRate = await calculateLaborCost();
+        const costPerSecond = totalRate / 3600;
+        setLiveLaborCost(prev => prev + costPerSecond);
     }, 1000);
 
-    const profitInterval = setInterval(() => {
-      setTodaysProfit(prevProfit => prevProfit + (costPerSecond * 2.5)); // Simulate profit increasing
-    }, 5000);
+    const kpiInterval = setInterval(fetchKpis, 30000); // Refresh KPIs every 30 seconds
 
     return () => {
       clearInterval(laborInterval);
-      clearInterval(profitInterval);
+      clearInterval(kpiInterval);
     };
   }, []);
-
-  const kpiData = {
-    pendingJobs: jobsData.filter(j => ["not_started", "waiting_parts", "waiting_approval"].includes(j.status)).length,
-    dailyRevenue: 12450,
-    activeJobs: jobsData.filter(j => j.status === "in_progress").length,
-    efficiency: { value: 87, change: 5 },
-  };
 
   const handleJobClick = (job) => {
     setSelectedJob(job);
@@ -151,8 +178,7 @@ const Index = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">${todaysProfit.toFixed(2)}</div>
-                <div className="text-xs text-green-100">Est. Total: ${(todaysProfit * 1.2).toFixed(2)}</div>
+                <div className="text-3xl font-bold">${kpiData.todaysProfit.toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
@@ -163,9 +189,6 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-lg font-bold">{kpiData.activeJobs} Active Jobs</div>
-                <div className="text-xs text-purple-100 mt-1">
-                  {kpiData.efficiency.value}% efficiency <span className="text-green-300">(+{kpiData.efficiency.change}%)</span>
-                </div>
               </CardContent>
             </Card>
           </div>

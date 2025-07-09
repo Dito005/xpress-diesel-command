@@ -12,19 +12,16 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
-// This function now calls a Supabase Edge Function named 'vin-lookup'
 const fetchVehicleDataFromVIN = async (vin: string) => {
   const { data, error } = await supabase.functions.invoke('vin-lookup', {
     body: { vin },
   });
 
   if (error) {
-    // Handle structured errors from the Edge Function
     if (error instanceof FunctionsHttpError) {
       const errorMessage = await error.context.json();
       throw new Error(errorMessage.error || 'An unknown error occurred during VIN lookup.');
     }
-    // Handle generic errors
     throw new Error(error.message);
   }
 
@@ -44,6 +41,7 @@ const formSchema = z.object({
 export const NewJobForm = () => {
   const { toast } = useToast();
   const [isVinLoading, setIsVinLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -93,13 +91,40 @@ export const NewJobForm = () => {
     }
   };
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log("Submitting new job:", values);
-    // Here you would call your Supabase function to save the job
-    toast({
-      title: "Job Created",
-      description: `A new job for ${values.customerName} has been created.`,
-    });
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsSubmitting(true);
+    
+    const { error } = await supabase.from('jobs').insert([
+      { 
+        vehicle_info: {
+          vin: values.vin,
+          make: values.make,
+          model: values.model,
+          year: values.year,
+        },
+        customer_info: {
+          name: values.customerName,
+          phone: values.customerPhone,
+        },
+        description: values.complaint,
+        status: 'pending', // Default status
+      }
+    ]);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to create job",
+        description: error.message,
+      });
+    } else {
+      toast({
+        title: "Job Created Successfully",
+        description: `A new job for ${values.customerName} has been added to the board.`,
+      });
+      form.reset();
+    }
+    setIsSubmitting(false);
   };
 
   return (
@@ -214,8 +239,8 @@ export const NewJobForm = () => {
         </div>
 
         <div className="flex justify-end">
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-            Create Job
+          <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Job"}
           </Button>
         </div>
       </form>
