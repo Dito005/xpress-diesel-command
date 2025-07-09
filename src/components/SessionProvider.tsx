@@ -37,42 +37,34 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
 
       if (techError) {
         console.error("Error fetching user role from techs table:", techError);
-        console.error("Full techError object:", JSON.stringify(techError, null, 2));
-        setUserRole('unassigned'); // Fallback on any error
-        console.warn(`Failed to fetch role for user ${userId}. Assigning 'unassigned' role.`);
-      } else if (techDataArray && techDataArray.length > 0 && techDataArray[0].role) {
-        const fetchedRole = techDataArray[0].role;
-        if (isUserRole(fetchedRole)) {
-          setUserRole(fetchedRole);
-          console.log(`User ${userId} role set to: ${fetchedRole}`);
-        } else {
-          setUserRole('unassigned');
-          console.warn(`Fetched role '${fetchedRole}' for user ${userId} is invalid. Assigning 'unassigned' role.`);
-        }
+        setUserRole('unassigned');
+      } else if (techDataArray && techDataArray.length > 0 && isUserRole(techDataArray[0].role)) {
+        setUserRole(techDataArray[0].role);
       } else {
         setUserRole('unassigned');
         console.warn(`User ${userId} tech profile not found or role is missing. Assigning 'unassigned' role.`);
       }
     };
 
-    const handleAuthStateChange = (event: string, currentSession: Session | null) => {
-      setSession(currentSession);
-      setIsLoading(false); // Set isLoading to false immediately after session status is known
-
-      if (currentSession) {
-        console.log("Session found for user ID:", currentSession.user.id);
-        fetchUserRole(currentSession.user.id); // Fetch role asynchronously
+    // This function will handle setting session, role, and loading state.
+    const setAuthData = async (session: Session | null) => {
+      setSession(session);
+      if (session) {
+        await fetchUserRole(session.user.id);
       } else {
         setUserRole(null);
-        console.log("No active session. User role set to null.");
       }
+      setIsLoading(false);
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
-
     // Initial session check
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      handleAuthStateChange('INITIAL_SESSION', initialSession);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthData(session);
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthData(session);
     });
 
     return () => subscription.unsubscribe();
