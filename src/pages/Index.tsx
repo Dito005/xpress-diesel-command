@@ -18,7 +18,7 @@ import { TechnicianList } from "@/components/TechnicianList";
 import { BusinessCosts } from "@/components/BusinessCosts";
 import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
 import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
-import { PartsLookupTool } from "@/components/PartsLookupTool";
+import { PartsLookupTool } from "@/components/PartsLookupTool"; // Corrected import statement
 import { supabase } from "@/integrations/supabase/client"; // Changed import path
 import { useSession } from "@/components/SessionProvider"; // Import useSession
 import { useNavigate } from "react-router-dom";
@@ -139,17 +139,17 @@ const Index = () => {
   };
 
   const TABS_CONFIG: { value: string; label: string; icon: React.ElementType; roles: UserRole[] }[] = [
-    { value: "ai-analyzer", label: "AI Mission", icon: Brain, roles: ["admin", "manager"] },
-    { value: "jobs", label: "Jobs", icon: Wrench, roles: ["admin", "manager"] },
-    { value: "technician", label: userRole === "mechanic" ? "My Jobs" : "Techs", icon: Users, roles: ["admin", "manager", "mechanic"] },
-    { value: "parts", label: "Parts", icon: Package, roles: ["admin", "manager", "parts"] },
-    { value: "road", label: "Road", icon: MapPin, roles: ["admin", "manager", "road"] },
-    { value: "invoicing", label: "Invoicing", icon: Calculator, roles: ["admin", "manager"] },
-    { value: "reports", label: "Reports", icon: FileText, roles: ["admin", "manager"] },
-    { value: "parts-lookup", label: "Parts Lookup", icon: Search, roles: ["admin", "manager", "parts", "mechanic"] },
-    { value: "ai-helper", label: "AI Helper", icon: Bot, roles: ["admin", "manager", "mechanic", "road", "parts"] },
-    { value: "costs", label: "Costs", icon: Database, roles: ["admin", "manager"] },
-    { value: "settings", label: "Settings", icon: Settings, roles: ["admin"] },
+    { value: "ai-analyzer", label: "AI Mission", icon: Brain, roles: ["admin", "manager", "unassigned"] },
+    { value: "jobs", label: "Jobs", icon: Wrench, roles: ["admin", "manager", "unassigned"] },
+    { value: "technician", label: userRole === "mechanic" ? "My Jobs" : "Techs", icon: Users, roles: ["admin", "manager", "mechanic", "unassigned"] },
+    { value: "parts", label: "Parts", icon: Package, roles: ["admin", "manager", "parts", "unassigned"] },
+    { value: "road", label: "Road", icon: MapPin, roles: ["admin", "manager", "road", "unassigned"] },
+    { value: "invoicing", label: "Invoicing", icon: Calculator, roles: ["admin", "manager", "unassigned"] },
+    { value: "reports", label: "Reports", icon: FileText, roles: ["admin", "manager", "unassigned"] },
+    { value: "parts-lookup", label: "Parts Lookup", icon: Search, roles: ["admin", "manager", "parts", "mechanic", "unassigned"] },
+    { value: "ai-helper", label: "AI Helper", icon: Bot, roles: ["admin", "manager", "mechanic", "road", "parts", "unassigned"] },
+    { value: "costs", label: "Costs", icon: Database, roles: ["admin", "manager", "unassigned"] },
+    { value: "settings", label: "Settings", icon: Settings, roles: ["admin", "unassigned"] },
   ];
 
   const visibleTabs = TABS_CONFIG.filter(tab => {
@@ -159,7 +159,7 @@ const Index = () => {
     // Apply the type guard here. If true, userRole is now narrowed to UserRole within this block.
     if (isUserRole(userRole)) {
       // Now, userRole is correctly inferred as UserRole, so direct comparison is fine.
-      return tab.roles.some((role: UserRole) => role === userRole);
+      return tab.roles.some(role => role === userRole);
     }
     return false; // If userRole is a string but not a valid UserRole
   });
@@ -190,7 +190,7 @@ const Index = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {(userRole === "admin" || userRole === "manager") && (
+        {(userRole === "admin" || userRole === "manager" || userRole === "unassigned") && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
               <CardHeader className="pb-2">
