@@ -40,7 +40,7 @@ export const JobBoard = ({ onJobClick }) => {
 
   const getStatusColor = (status) => {
     switch(status) {
-      case "pending": return "bg-gray-100 text-gray-800 border-gray-300";
+      case "open": return "bg-gray-100 text-gray-800 border-gray-300";
       case "in_progress": return "bg-blue-100 text-blue-800 border-blue-300";
       case "waiting_parts": return "bg-yellow-100 text-yellow-800 border-yellow-300";
       case "completed": return "bg-green-100 text-green-800 border-green-300";
@@ -53,7 +53,7 @@ export const JobBoard = ({ onJobClick }) => {
   };
 
   const jobsByStatus = {
-    pending: jobs.filter(job => job.status === "pending"),
+    open: jobs.filter(job => job.status === "open"),
     in_progress: jobs.filter(job => job.status === "in_progress"),
     waiting_parts: jobs.filter(job => job.status === "waiting_parts"),
     completed: jobs.filter(job => job.status === "completed")
@@ -100,7 +100,7 @@ export const JobBoard = ({ onJobClick }) => {
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        {job.vehicle_info.vin.slice(-6)}
+                        {job.truck_vin.slice(-6)}
                       </CardTitle>
                       <Badge className={getStatusColor(job.status)} variant="outline">
                         {getStatusText(job.status)}
@@ -108,8 +108,8 @@ export const JobBoard = ({ onJobClick }) => {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 space-y-2">
-                    <div className="text-sm font-medium text-gray-900">{job.vehicle_info.make} {job.vehicle_info.model}</div>
-                    <div className="text-xs text-gray-600">{job.customer_info.name}</div>
+                    <div className="text-sm font-medium text-gray-900">{job.job_type}</div>
+                    <div className="text-xs text-gray-600">{job.customer_name}</div>
                     
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <User className="h-3 w-3" />
@@ -117,7 +117,7 @@ export const JobBoard = ({ onJobClick }) => {
                     </div>
                     
                     <div className="text-xs text-gray-500 line-clamp-2">
-                      {job.description}
+                      {job.notes}
                     </div>
                   </CardContent>
                 </Card>

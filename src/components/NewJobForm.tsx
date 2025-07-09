@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -29,13 +30,15 @@ const fetchVehicleDataFromVIN = async (vin: string) => {
 };
 
 const formSchema = z.object({
-  vin: z.string().length(17, "VIN must be 17 characters"),
+  truckVin: z.string().length(17, "VIN must be 17 characters"),
   make: z.string().min(1, "Make is required"),
   model: z.string().min(1, "Model is required"),
   year: z.string().min(4, "Year is required"),
   customerName: z.string().min(1, "Customer name is required"),
+  customerEmail: z.string().email("Invalid email address").optional().or(z.literal('')),
   customerPhone: z.string().min(1, "Customer phone is required"),
-  complaint: z.string().min(10, "Please provide a detailed complaint"),
+  jobType: z.string().min(1, "Job type is required"),
+  notes: z.string().min(10, "Please provide a detailed complaint/notes"),
 });
 
 export const NewJobForm = () => {
@@ -46,18 +49,20 @@ export const NewJobForm = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      vin: "",
+      truckVin: "",
       make: "",
       model: "",
       year: "",
       customerName: "",
+      customerEmail: "",
       customerPhone: "",
-      complaint: "",
+      jobType: "",
+      notes: "",
     },
   });
 
   const handleVinLookup = async () => {
-    const vin = form.getValues("vin");
+    const vin = form.getValues("truckVin");
     if (vin.length !== 17) {
       toast({
         variant: "destructive",
@@ -96,18 +101,15 @@ export const NewJobForm = () => {
     
     const { error } = await supabase.from('jobs').insert([
       { 
-        vehicle_info: {
-          vin: values.vin,
-          make: values.make,
-          model: values.model,
-          year: values.year,
-        },
-        customer_info: {
-          name: values.customerName,
-          phone: values.customerPhone,
-        },
-        description: values.complaint,
-        status: 'pending', // Default status
+        truck_vin: values.truckVin,
+        customer_name: values.customerName,
+        customer_email: values.customerEmail,
+        customer_phone: values.customerPhone,
+        job_type: values.jobType,
+        notes: values.notes,
+        status: 'open', // Default status for new jobs
+        // Assuming 'make', 'model', 'year' are not directly stored in 'jobs' table,
+        // or are part of a separate 'vehicles' table. For now, they are just for VIN lookup display.
       }
     ]);
 
@@ -135,7 +137,7 @@ export const NewJobForm = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="vin"
+              name="truckVin"
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
                   <FormLabel>VIN</FormLabel>
@@ -222,13 +224,54 @@ export const NewJobForm = () => {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="customerEmail"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Customer Email (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="john.doe@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="jobType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Job Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select job type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="PM Service">PM Service</SelectItem>
+                      <SelectItem value="Brake Repair">Brake Repair</SelectItem>
+                      <SelectItem value="Engine Work">Engine Work</SelectItem>
+                      <SelectItem value="AC Repair">AC Repair</SelectItem>
+                      <SelectItem value="Transmission">Transmission</SelectItem>
+                      <SelectItem value="Electrical">Electrical</SelectItem>
+                      <SelectItem value="Road Service">Road Service</SelectItem>
+                      <SelectItem value="Diagnostic">Diagnostic</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
           <FormField
             control={form.control}
-            name="complaint"
+            name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Customer Complaint</FormLabel>
+                <FormLabel>Customer Complaint / Notes</FormLabel>
                 <FormControl>
                   <Textarea placeholder="Describe the issue with the vehicle..." {...field} />
                 </FormControl>

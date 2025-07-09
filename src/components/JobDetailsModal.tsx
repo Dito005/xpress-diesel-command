@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 export const JobDetailsModal = ({ job, onClose, userRole }) => {
   const { toast } = useToast();
   const [notes, setNotes] = useState(job?.notes || "");
-  const [jobStatus, setJobStatus] = useState(job?.status || "not_started");
+  const [jobStatus, setJobStatus] = useState(job?.status || "open"); // Default to 'open'
   const [currentJobTimeLog, setCurrentJobTimeLog] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
 
@@ -43,7 +43,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
 
   const getStatusColor = (status) => {
     switch(status) {
-      case "not_started": return "bg-gray-100 text-gray-800 border-gray-300";
+      case "open": return "bg-gray-100 text-gray-800 border-gray-300";
       case "in_progress": return "bg-blue-100 text-blue-800 border-blue-300";
       case "waiting_parts": return "bg-yellow-100 text-yellow-800 border-yellow-300";
       case "waiting_approval": return "bg-orange-100 text-orange-800 border-orange-300";
@@ -100,7 +100,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
   };
 
   const handleGenerateInvoice = async () => {
-    if (!job?.id || !job.customer_info?.name || !job.description) {
+    if (!job?.id || !job.customer_name || !job.job_type) {
       toast({ variant: "destructive", title: "Missing Job Details", description: "Cannot generate invoice without complete job info." });
       return;
     }
@@ -112,10 +112,10 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
       {
         job_id: job.id,
         amount: estimatedAmount,
-        items: { description: job.description }, // Use job description as invoice item
+        items: { description: job.notes || job.job_type }, // Use job notes or job type as invoice item description
         paid: false,
-        customer_name: job.customer_info.name, // Assuming these columns exist in invoices table
-        customer_email: job.customer_info.email,
+        customer_name: job.customer_name,
+        customer_email: job.customer_email,
         status: 'pending'
       }
     ]);
@@ -123,7 +123,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
     if (error) {
       toast({ variant: "destructive", title: "Invoice Generation Failed", description: error.message });
     } else {
-      toast({ title: "Invoice Generated", description: `Invoice for Job ${job.vehicle_info.vin.slice(-6)} created.` });
+      toast({ title: "Invoice Generated", description: `Invoice for Job ${job.truck_vin.slice(-6)} created.` });
       // Optionally update job status to 'invoiced'
     }
   };
@@ -134,7 +134,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Truck className="h-6 w-6 text-blue-600" />
-            Job Details - {job.vehicle_info.vin.slice(-6)}
+            Job Details - {job.truck_vin.slice(-6)}
             <Badge className={getStatusColor(job.status)} variant="outline">
               {job.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </Badge>
@@ -155,22 +155,22 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600">Unit Number</label>
-                    <div className="font-semibold">{job.vehicle_info.vin.slice(-6)}</div>
+                    <div className="font-semibold">{job.truck_vin.slice(-6)}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Job Type</label>
-                    <div className="font-semibold">{job.description}</div> {/* Using description as job type for now */}
+                    <div className="font-semibold">{job.job_type}</div>
                   </div>
                 </div>
                 
                 <div>
                   <label className="text-sm font-medium text-gray-600">Customer</label>
-                  <div className="font-semibold">{job.customer_info.name}</div>
+                  <div className="font-semibold">{job.customer_name}</div>
                 </div>
                 
                 <div>
                   <label className="text-sm font-medium text-gray-600">Complaint</label>
-                  <div className="text-gray-900">{job.description}</div>
+                  <div className="text-gray-900">{job.notes}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
