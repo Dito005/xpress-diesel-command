@@ -7,36 +7,35 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { SessionProvider, useSession } from "./components/SessionProvider";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
+
+// A component to display while the session is loading
+const AuthLoading = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+  </div>
+);
 
 // Component to handle routing based on session state
 const AppRoutes = () => {
   const { session, isLoading } = useSession();
 
-  // If not loading and no session, immediately navigate to login
-  if (!isLoading && !session) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // While loading, or if session exists, render the routes
-  // The "Loading authentication..." message is now handled by not rendering anything
-  // until the session is determined, then immediately redirecting or showing content.
   if (isLoading) {
-    return null; // Or a very minimal, quick loading indicator if absolutely necessary
+    return <AuthLoading />;
   }
 
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      {session ? (
-        // If session exists, allow access to dashboard and other private routes
-        <Route path="/" element={<Index />} />
-      ) : (
-        // This case should ideally be caught by the initial !isLoading && !session check
-        // but kept as a fallback.
-        <Route path="/" element={<Navigate to="/login" replace />} />
-      )}
+      <Route 
+        path="/login" 
+        element={!session ? <Login /> : <Navigate to="/" replace />} 
+      />
+      <Route 
+        path="/" 
+        element={session ? <Index /> : <Navigate to="/login" replace />} 
+      />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
