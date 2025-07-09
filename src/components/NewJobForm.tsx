@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
@@ -29,6 +29,22 @@ const fetchVehicleDataFromVIN = async (vin: string) => {
   return data;
 };
 
+// Simulated USDOT lookup for demonstration
+const fetchCompanyDataFromUSDOT = async (usdot: string) => {
+  console.log(`Simulating USDOT lookup for: ${usdot}`);
+  await new Promise(res => setTimeout(res, 1000)); // Simulate network delay
+  if (usdot === "1234567") {
+    return {
+      companyName: "Acme Trucking Inc.",
+      companyPhone: "(800) 555-1234",
+      companyAddress: "456 Trucker Blvd, Big City, TX 75001",
+      mcNumber: "MC-987654",
+    };
+  } else {
+    throw new Error("USDOT number not found or invalid.");
+  }
+};
+
 const formSchema = z.object({
   truckVin: z.string().length(17, "VIN must be 17 characters"),
   make: z.string().min(1, "Make is required"),
@@ -37,19 +53,21 @@ const formSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
   customerEmail: z.string().email("Invalid email address").optional().or(z.literal('')),
   customerPhone: z.string().min(1, "Customer phone is required"),
+  usdotNumber: z.string().optional(), // New USDOT field
+  company: z.string().optional(), // Company name from USDOT or manual
   jobType: z.string().min(1, "Job type is required"),
   customerConcern: z.string().min(10, "Please provide a detailed customer concern"),
   recommendedService: z.string().optional(),
-  actualService: z.string().optional(),
   notes: z.string().optional(),
-  assignedTechId: z.string().optional(), // New field for tech assignment
+  assignedTechId: z.string().optional(),
 });
 
 export const NewJobForm = () => {
   const { toast } = useToast();
   const [isVinLoading, setIsVinLoading] = useState(false);
+  const [isUsdotLoading, setIsUsdotLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [techs, setTechs] = useState([]); // State to hold available technicians
+  const [techs, setTechs] = useState([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -61,12 +79,13 @@ export const NewJobForm = () => {
       customerName: "",
       customerEmail: "",
       customerPhone: "",
+      usdotNumber: "",
+      company: "",
       jobType: "",
       customerConcern: "",
       recommendedService: "",
-      actualService: "",
       notes: "",
-      assignedTechId: "", // Default for new field
+      assignedTechId: "",
     },
   });
 
@@ -119,6 +138,40 @@ export const NewJobForm = () => {
     }
   };
 
+  const handleUsdotLookup = async () => {
+    const usdot = form.getValues("usdotNumber");
+    if (!usdot) {
+      toast({
+        variant: "destructive",
+        title: "Missing USDOT",
+        description: "Please enter a USDOT number.",
+      });
+      return;
+    }
+
+    setIsUsdotLoading(true);
+    try {
+      const data = await fetchCompanyDataFromUSDOT(usdot);
+      form.setValue("company", data.companyName || "");
+      form.setValue("customerPhone", data.companyPhone || form.getValues("customerPhone"));
+      // Potentially set customer address, MC number in customer_info JSONB
+      form.setValue("customerName", data.companyName || form.getValues("customerName")); // Often company name is customer name
+      toast({
+        title: "USDOT Lookup Successful",
+        description: `Found company: ${data.companyName}.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "USDOT Lookup Failed",
+        description: error.message,
+      });
+      form.setValue("company", "");
+    } finally {
+      setIsUsdotLoading(false);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     
@@ -128,16 +181,18 @@ export const NewJobForm = () => {
         customer_name: values.customerName,
         customer_email: values.customerEmail,
         customer_phone: values.customerPhone,
+        company: values.company, // Store company name
         job_type: values.jobType,
         notes: values.notes,
         customer_concern: values.customerConcern,
         recommended_service: values.recommendedService,
-        actual_service: values.actualService,
         status: 'open',
         customer_info: {
           make: values.make,
           model: values.model,
           year: values.year,
+          usdot_number: values.usdotNumber, // Store USDOT in customer_info
+          // Add other USDOT fields here if fetched and needed
         },
       }
     ]).select().single();
@@ -167,7 +222,6 @@ export const NewJobForm = () => {
           title: "Failed to assign technician",
           description: assignmentError.message,
         });
-        // Optionally, you might want to delete the job if assignment fails critically
       } else {
         toast({
           title: "Technician Assigned",
@@ -186,28 +240,29 @@ export const NewJobForm = () => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4 overflow-y-auto max-h-[calc(90vh-100px)]"> {/* Added overflow-y-auto and max-height */}
         <div className="space-y-4 p-4 border rounded-lg">
           <h3 className="font-semibold text-lg">Vehicle Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="truckVin"
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>VIN</FormLabel>
-                  <div className="flex gap-2">
-                    <FormControl>
-                      <Input placeholder="Enter 17-character VIN" {...field} />
-                    </FormControl>
-                    <Button type="button" onClick={handleVinLookup} disabled={isVinLoading}>
-                      {isVinLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lookup"}
-                    </Button>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <FormField
+            control={form.control}
+            name="truckVin"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>VIN</FormLabel>
+                <FormDescription>Enter the 17-character Vehicle Identification Number.</FormDescription>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input placeholder="Enter 17-character VIN" {...field} />
+                  </FormControl>
+                  <Button type="button" onClick={handleVinLookup} disabled={isVinLoading}>
+                    {isVinLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField
               control={form.control}
               name="make"
@@ -251,7 +306,7 @@ export const NewJobForm = () => {
         </div>
 
         <div className="space-y-4 p-4 border rounded-lg">
-          <h3 className="font-semibold text-lg">Customer & Job Details</h3>
+          <h3 className="font-semibold text-lg">Customer & Company Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -259,6 +314,7 @@ export const NewJobForm = () => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Name</FormLabel>
+                  <FormDescription>Individual or primary contact name.</FormDescription>
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
                   </FormControl>
@@ -272,6 +328,7 @@ export const NewJobForm = () => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Phone</FormLabel>
+                  <FormDescription>Primary contact phone number.</FormDescription>
                   <FormControl>
                     <Input placeholder="(555) 123-4567" {...field} />
                   </FormControl>
@@ -285,6 +342,7 @@ export const NewJobForm = () => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Email (Optional)</FormLabel>
+                  <FormDescription>Email for invoices and updates.</FormDescription>
                   <FormControl>
                     <Input placeholder="john.doe@example.com" {...field} />
                   </FormControl>
@@ -294,62 +352,78 @@ export const NewJobForm = () => {
             />
             <FormField
               control={form.control}
-              name="jobType"
+              name="usdotNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Job Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel>USDOT Number (Optional)</FormLabel>
+                  <FormDescription>Enter company's USDOT number to auto-fill company info.</FormDescription>
+                  <div className="flex gap-2">
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select job type" />
-                      </SelectTrigger>
+                      <Input placeholder="e.g., 1234567" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="PM Service">PM Service</SelectItem>
-                      <SelectItem value="Brake Repair">Brake Repair</SelectItem>
-                      <SelectItem value="Engine Work">Engine Work</SelectItem>
-                      <SelectItem value="AC Repair">AC Repair</SelectItem>
-                      <SelectItem value="Transmission">Transmission</SelectItem>
-                      <SelectItem value="Electrical">Electrical</SelectItem>
-                      <SelectItem value="Road Service">Road Service</SelectItem>
-                      <SelectItem value="Diagnostic">Diagnostic</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <Button type="button" onClick={handleUsdotLookup} disabled={isUsdotLoading}>
+                      {isUsdotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    </Button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="assignedTechId"
+              name="company"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assign Technician (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select technician" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem> {/* Changed value from "" to "unassigned" */}
-                      {techs.map(tech => (
-                        <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Company Name (Optional)</FormLabel>
+                  <FormDescription>Auto-filled from USDOT or manually entered.</FormDescription>
+                  <FormControl>
+                    <Input placeholder="Acme Trucking Inc." {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
           </div>
+        </div>
+
+        <div className="space-y-4 p-4 border rounded-lg">
+          <h3 className="font-semibold text-lg">Job Details & Assignment</h3>
+          <FormField
+            control={form.control}
+            name="jobType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Job Type</FormLabel>
+                <FormDescription>Select the primary type of service required.</FormDescription>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select job type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="PM Service">PM Service</SelectItem>
+                    <SelectItem value="Brake Repair">Brake Repair</SelectItem>
+                    <SelectItem value="Engine Work">Engine Work</SelectItem>
+                    <SelectItem value="AC Repair">AC Repair</SelectItem>
+                    <SelectItem value="Transmission">Transmission</SelectItem>
+                    <SelectItem value="Electrical">Electrical</SelectItem>
+                    <SelectItem value="Road Service">Road Service</SelectItem>
+                    <SelectItem value="Diagnostic">Diagnostic</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <FormField
             control={form.control}
             name="customerConcern"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Customer Complaint</FormLabel>
+                <FormDescription>Detailed description of the issue reported by the customer.</FormDescription>
                 <FormControl>
                   <Textarea placeholder="Describe the customer's issue..." {...field} />
                 </FormControl>
@@ -363,21 +437,9 @@ export const NewJobForm = () => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Recommended Service (Optional)</FormLabel>
+                <FormDescription>Any additional services recommended during initial assessment.</FormDescription>
                 <FormControl>
                   <Textarea placeholder="Any recommended services..." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="actualService"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Actual Service Performed (Optional)</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="What work was actually performed..." {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -389,9 +451,34 @@ export const NewJobForm = () => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Internal Notes (Optional)</FormLabel>
+                <FormDescription>Any internal notes for the job, not visible to the customer.</FormDescription>
                 <FormControl>
                   <Textarea placeholder="Any internal notes for the job..." {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="assignedTechId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Assign Technician (Optional)</FormLabel>
+                <FormDescription>Assign a technician to this job immediately.</FormDescription>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select technician" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {techs.map(tech => (
+                      <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

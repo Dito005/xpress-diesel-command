@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { FileText, Plus, DollarSign, Send, Printer, Bot, CreditCard, Check, Trash2, Loader2, Search } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 // AI-powered suggestions for invoice descriptions
@@ -380,9 +380,13 @@ export const InvoicingSystem = () => {
     }).join('') || '';
 
     const miscCharges = invoice.misc_charges || 0;
-    const subtotal = (invoice.total || 0) - (invoice.tax_amount || 0) - (invoice.card_fee_amount || 0); // Recalculate subtotal from total if needed
-    const taxAmount = invoice.tax_amount || 0;
-    const cardFeeAmount = invoice.card_fee_amount || 0;
+    // Ensure total is a number before calculations
+    const invoiceTotal = typeof invoice.total === 'number' ? invoice.total : 0; 
+    const taxAmount = typeof invoice.tax_amount === 'number' ? invoice.tax_amount : 0;
+    const cardFeeAmount = typeof invoice.card_fee_amount === 'number' ? invoice.card_fee_amount : 0;
+
+    // Recalculate subtotal from total if needed, or use a stored subtotal if available
+    const subtotal = invoiceTotal - taxAmount - cardFeeAmount; 
 
     return `
       <html>
@@ -478,7 +482,7 @@ export const InvoicingSystem = () => {
 
           <div class="total-section">
             <span class="total-label">Total:</span>
-            <span class="total-amount">$${invoice.total.toFixed(2)}</span>
+            <span class="total-amount">$${invoiceTotal.toFixed(2)}</span>
           </div>
 
           ${!invoice.paid && payNowLink ? `<div style="text-align: center;"><a href="${payNowLink}" class="pay-now-button">Pay Now</a></div>` : ''}
@@ -591,9 +595,9 @@ export const InvoicingSystem = () => {
   }[status] || "bg-gray-100 text-gray-800");
 
   const filteredInvoices = invoices.filter(invoice =>
-    invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.jobs?.truck_vin?.toLowerCase().includes(searchTerm.toLowerCase())
+    (invoice.id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (invoice.customer_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (invoice.jobs?.truck_vin?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const currentFormValues = form.watch();
@@ -972,25 +976,29 @@ export const InvoicingSystem = () => {
         <CardHeader><CardTitle>Recent Invoices</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredInvoices.map((invoice) => (
-              <div key={invoice.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <h3 className="font-semibold">Invoice #{invoice.id.slice(0, 8)}</h3>
-                  <p className="text-sm text-gray-600">{invoice.customer_name || invoice.jobs?.customer_name || 'N/A'}</p>
-                  <Badge className={getStatusColor(invoice.status)}>{invoice.status}</Badge>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-bold">${invoice.total.toLocaleString()}</p>
-                  <div className="flex gap-2 mt-2">
-                    <Button size="sm" variant="outline" onClick={() => handleSendInvoice(invoice)}><Send className="h-3 w-3" /></Button>
-                    <Button size="sm" variant="outline" onClick={() => handlePrintInvoice(invoice)}><Printer className="h-3 w-3" /></Button>
-                    {invoice.status !== 'paid' && (
-                      <Button size="sm" onClick={() => { setSelectedInvoice(invoice); setIsPaymentModalOpen(true); }}>Process Payment</Button>
-                    )}
+            {filteredInvoices.length === 0 ? (
+              <p className="text-center text-gray-500">No invoices found.</p>
+            ) : (
+              filteredInvoices.map((invoice) => (
+                <div key={invoice.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <h3 className="font-semibold">Invoice #{invoice.id?.slice(0, 8) || 'N/A'}</h3>
+                    <p className="text-sm text-gray-600">{invoice.customer_name || invoice.jobs?.customer_name || 'N/A'}</p>
+                    <Badge className={getStatusColor(invoice.status)}>{invoice.status}</Badge>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold">${(typeof invoice.total === 'number' ? invoice.total : 0).toLocaleString()}</p>
+                    <div className="flex gap-2 mt-2">
+                      <Button size="sm" variant="outline" onClick={() => handleSendInvoice(invoice)}><Send className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="outline" onClick={() => handlePrintInvoice(invoice)}><Printer className="h-3 w-3" /></Button>
+                      {invoice.status !== 'paid' && (
+                        <Button size="sm" onClick={() => { setSelectedInvoice(invoice); setIsPaymentModalOpen(true); }}>Process Payment</Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

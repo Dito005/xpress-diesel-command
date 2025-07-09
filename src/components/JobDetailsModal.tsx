@@ -4,19 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label"; // Added Label import
 import { Clock, DollarSign, User, Truck, FileText, Camera, Save, Play, Pause } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useSession } from "@/components/SessionProvider"; // Import useSession
+import { useSession } from "@/components/SessionProvider";
 
 export const JobDetailsModal = ({ job, onClose, userRole }) => {
   const { toast } = useToast();
   const [notes, setNotes] = useState(job?.notes || "");
-  const [jobStatus, setJobStatus] = useState(job?.status || "open"); // Default to 'open'
+  const [actualService, setActualService] = useState(job?.actual_service || ""); // New state for actual service
+  const [jobStatus, setJobStatus] = useState(job?.status || "open");
   const [currentJobTimeLog, setCurrentJobTimeLog] = useState(null);
-  const { session } = useSession(); // Get session from context
-  const [currentTechId, setCurrentTechId] = useState(null); // This will be the ID from public.techs
-  const [assignedTechNames, setAssignedTechNames] = useState(''); // State for assigned tech names
+  const { session } = useSession();
+  const [currentTechId, setCurrentTechId] = useState(null);
+  const [assignedTechNames, setAssignedTechNames] = useState('');
 
   useEffect(() => {
     const fetchUserAndLog = async () => {
@@ -46,8 +48,9 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         if (assignError) {
           console.error("Error fetching job assignments:", assignError);
         } else {
-          // Access name from the nested array structure
-          const names = assignments.map(assign => assign.techs?.[0]?.name).filter(Boolean).join(', ');
+          // Explicitly type 'assign' to help TypeScript understand the structure
+          // and safely access the name from the potentially array-like 'techs' relation.
+          const names = assignments.map((assign: { techs: Array<{ name: string | null }> | null }) => assign.techs?.[0]?.name).filter(Boolean).join(', ');
           setAssignedTechNames(names);
         }
       }
@@ -130,12 +133,12 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
     const { error } = await supabase.from('invoices').insert([
       {
         job_id: job.id,
-        amount: estimatedAmount,
-        items: { description: job.notes || job.job_type }, // Use job notes or job type as invoice item description
-        paid: false,
+        total: estimatedAmount, // Changed 'amount' to 'total' to match schema
+        // items: { description: job.notes || job.job_type }, // Removed 'items' as it's not in schema
+        status: 'pending',
         customer_name: job.customer_name,
         customer_email: job.customer_email,
-        status: 'pending'
+        // Add other required invoice fields if necessary
       }
     ]);
 
@@ -147,15 +150,35 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
     }
   };
 
+  const handleSaveChanges = async () => {
+    if (!job?.id) return;
+
+    const { error } = await supabase
+      .from('jobs')
+      .update({
+        notes: notes,
+        actual_service: actualService, // Save actual service
+        status: jobStatus, // Save status if it's changed
+      })
+      .eq('id', job.id);
+
+    if (error) {
+      toast({ variant: "destructive", title: "Error saving changes", description: error.message });
+    } else {
+      toast({ title: "Changes Saved", description: "Job details updated successfully." });
+      onClose(); // Close modal after saving
+    }
+  };
+
   return (
     <Dialog open={!!job} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Truck className="h-6 w-6 text-blue-600" />
-            Job Details - {job.truck_vin.slice(-6)}
+            Job Details - {job.truck_vin?.slice(-6) || 'N/A'}
             <Badge className={getStatusColor(job.status)} variant="outline">
-              {job.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              {job.status?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}
             </Badge>
           </DialogTitle>
         </DialogHeader>
@@ -173,23 +196,23 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Unit Number</label>
-                    <div className="font-semibold">{job.truck_vin.slice(-6)}</div>
+                    <Label className="text-sm font-medium text-gray-600">Unit Number</Label>
+                    <div className="font-semibold">{job.truck_vin?.slice(-6) || 'N/A'}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Job Type</label>
-                    <div className="font-semibold">{job.job_type}</div>
+                    <Label className="text-sm font-medium text-gray-600">Job Type</Label>
+                    <div className="font-semibold">{job.job_type || 'N/A'}</div>
                   </div>
                 </div>
                 
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Customer</label>
-                  <div className="font-semibold">{job.customer_name}</div>
+                  <Label className="text-sm font-medium text-gray-600">Customer</Label>
+                  <div className="font-semibold">{job.customer_name || 'N/A'}</div>
                 </div>
                 
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Complaint</label>
-                  <div className="text-gray-900">{job.notes}</div>
+                  <Label className="text-sm font-medium text-gray-600">Complaint</Label>
+                  <div className="text-gray-900">{job.notes || 'N/A'}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -210,11 +233,11 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Estimated Hours</label>
+                    <Label className="text-sm font-medium text-gray-600">Estimated Hours</Label>
                     <div className="text-xl font-bold text-blue-600">{job.estimated_hours || 0}h</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Clocked Hours</label>
+                    <Label className="text-sm font-medium text-gray-600">Clocked Hours</Label>
                     <div className="text-xl font-bold text-green-600">{job.actual_hours || 0}h</div>
                   </div>
                 </div>
@@ -248,13 +271,13 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Est. Revenue</label>
+                      <Label className="text-sm font-medium text-gray-600">Est. Revenue</Label>
                       <div className="text-xl font-bold text-green-600">
                         ${job.estimatedRevenue?.toLocaleString() || '0'}
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Actual Cost</label>
+                      <Label className="text-sm font-medium text-gray-600">Actual Cost</Label>
                       <div className="text-xl font-bold text-red-600">
                         ${job.actualCost?.toLocaleString() || '0'}
                       </div>
@@ -278,24 +301,38 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Job Notes
+                  Job Notes & Work Performed
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Textarea
-                  placeholder="Add job notes, findings, or updates..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={4}
-                />
+                <div>
+                  <Label htmlFor="jobNotes">Internal Notes</Label>
+                  <Textarea
+                    id="jobNotes"
+                    placeholder="Add internal job notes, findings, or updates..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="actualService">Actual Work Performed</Label>
+                  <Textarea
+                    id="actualService"
+                    placeholder="Describe the actual work performed on the job..."
+                    value={actualService}
+                    onChange={(e) => setActualService(e.target.value)}
+                    rows={4}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" className="flex items-center gap-2">
                     <Camera className="h-4 w-4" />
                     Add Photo
                   </Button>
-                  <Button size="sm" className="flex items-center gap-2">
+                  <Button size="sm" className="flex items-center gap-2" onClick={handleSaveChanges}>
                     <Save className="h-4 w-4" />
-                    Save Notes
+                    Save Updates
                   </Button>
                 </div>
               </CardContent>
@@ -345,7 +382,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
             Close
           </Button>
           {(userRole === "admin" || userRole === "manager") && (
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSaveChanges}>
               Save Changes
             </Button>
           )}
