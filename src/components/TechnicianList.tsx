@@ -27,7 +27,7 @@ interface Technician {
 export const TechnicianList = () => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null);
-  const [isTimeLogModalOpen, setIsTimeLogModalOpen] = useState(false);
+  const [isTimeLogModalOpen, setIsTimeLogModal] = useState(false);
 
   useEffect(() => {
     fetchTechnicians();
@@ -62,7 +62,7 @@ export const TechnicianList = () => {
 
   const handleTechClick = (tech: Technician) => {
     setSelectedTech(tech);
-    setIsTimeLogModalOpen(true);
+    setIsTimeLogModal(true);
   };
 
   const getRoleBadgeColor = (role: string) => ({
@@ -116,7 +116,7 @@ export const TechnicianList = () => {
       {selectedTech && (
         <TechnicianTimeLogModal
           isOpen={isTimeLogModalOpen}
-          onClose={() => setIsTimeLogModalOpen(false)}
+          onClose={() => setIsTimeLogModal(false)}
           technician={selectedTech}
         />
       )}
