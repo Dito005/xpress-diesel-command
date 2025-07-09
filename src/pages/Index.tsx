@@ -145,7 +145,13 @@ const Index = () => {
     { value: "settings", label: "Settings", icon: Settings, roles: ["admin"] },
   ];
 
-  const visibleTabs = TABS_CONFIG.filter(tab => userRole && tab.roles.includes(userRole as UserRole));
+  const visibleTabs = TABS_CONFIG.filter(tab => {
+    if (userRole === null) {
+      return false;
+    }
+    // Use .some() to explicitly check if the userRole string matches any of the roles in the tab's roles array
+    return tab.roles.some(role => role === userRole);
+  });
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs"; // Fallback to 'jobs' if no specific role tabs
 
   return (
