@@ -156,7 +156,8 @@ const Index = () => {
     }
     // Use the type guard to narrow 'userRole' within this block
     if (isUserRole(userRole)) {
-      return tab.roles.includes(userRole);
+      const currentRole: UserRole = userRole; // Explicitly capture the narrowed type
+      return tab.roles.some(role => role === currentRole);
     }
     return false; // If userRole is a string but not a valid UserRole
   });
