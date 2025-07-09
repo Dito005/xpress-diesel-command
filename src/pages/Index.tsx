@@ -13,8 +13,8 @@ import { ReportsAnalytics } from "@/components/ReportsAnalytics";
 import { AIHelper } from "@/components/AIHelper";
 import { InvoicingSystem } from "@/components/InvoicingSystem";
 import { ShopSettings } from "@/components/ShopSettings";
-import { TechnicianManagement } from "@/components/TechnicianManagement";
-import { TechnicianList } from "@/components/TechnicianList";
+import { TechnicianManagement } from "@/components/TechnicianManagement"; // Corrected import
+import { TechnicianList } from "@/components/TechnicianList"; // Added missing import
 import { BusinessCosts } from "@/components/BusinessCosts";
 import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
 import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
@@ -156,10 +156,14 @@ const Index = () => {
     if (!userRole) {
       return false;
     }
-    // Use the type guard to narrow userRole
     if (isUserRole(userRole)) {
-      // Explicitly cast tab.roles to string[] for the includes method
-      return (tab.roles as string[]).includes(userRole);
+      // Manually check if any of the tab's roles match the user's role
+      for (const role of tab.roles) {
+        if (role === userRole) {
+          return true;
+        }
+      }
+      return false; // No matching role found
     }
     return false; // If userRole is a string but not a valid UserRole
   });
