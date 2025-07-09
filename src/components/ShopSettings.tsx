@@ -13,10 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "./SessionProvider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const fetchSettings = async () => {
+const fetchSettings = async (): Promise<Record<string, string>> => {
   const { data, error } = await supabase.from('settings').select('key, value');
   if (error) throw new Error(error.message);
-  return data.reduce((acc, setting) => {
+  return data.reduce((acc: Record<string, string>, setting) => {
     acc[setting.key] = setting.value;
     return acc;
   }, {});
