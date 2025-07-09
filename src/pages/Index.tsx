@@ -9,9 +9,33 @@ import { TechnicianDashboard } from "@/components/TechnicianDashboard";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { PartsRunnerDashboard } from "@/components/PartsRunnerDashboard";
 import { RoadServiceDashboard } from "@/components/RoadServiceDashboard";
-import { ReportsAnalytics } => {
+import { ReportsAnalytics } from "@/components/ReportsAnalytics";
+import { AIHelper } from "@/components/AIHelper";
+import { InvoicingSystem } from "@/components/InvoicingSystem";
+import { ShopSettings } from "@/components/ShopSettings";
+import { TechnicianManagement } from "@/components/TechnicianManagement";
+import { TechnicianList } from "@/components/TechnicianList";
+import { BusinessCosts } from "@/components/BusinessCosts";
+import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
+import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
+import { PartsLookupTool } from "@/components/PartsLookupTool";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/components/SessionProvider";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+
+type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts" | "unassigned";
+
+// Type guard function to check if a string is a valid UserRole
+function isUserRole(role: string | null): role is UserRole {
+  if (role === null) return false;
+  const validRoles: UserRole[] = ["admin", "manager", "mechanic", "road", "parts", "unassigned"];
+  return (validRoles as string[]).includes(role);
+}
+
+const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
-  const { userRole, session } = useSession(); // Get userRole and session from context
+  const { userRole, session } = useSession();
   const [liveLaborCost, setLiveLaborCost] = useState(0);
   const [kpiData, setKpiData] = useState({
     pendingJobs: 0,
@@ -23,14 +47,12 @@ import { ReportsAnalytics } => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!session) return; // Only fetch KPIs if session exists
+    if (!session) return;
 
     const fetchKpis = async () => {
-      // Fetch jobs for pending/active counts
       const { data: jobs, error: jobsError } = await supabase.from('jobs').select('status');
       if (jobsError) console.error('Error fetching jobs for KPIs', jobsError);
 
-      // Fetch invoices for profit calculation
       const today = new Date().toISOString().split('T')[0];
       const { data: invoices, error: invoicesError } = await supabase
         .from('invoices')
@@ -78,7 +100,7 @@ import { ReportsAnalytics } => {
       clearInterval(laborInterval);
       clearInterval(kpiInterval);
     };
-  }, [session]); // Re-run effect when session changes
+  }, [session]);
 
   const handleJobClick = (job) => {
     setSelectedJob(job);
@@ -129,9 +151,14 @@ import { ReportsAnalytics } => {
   ];
 
   const visibleTabs = TABS_CONFIG.filter(tab => {
-    // If userRole is null, filter it out. Otherwise, check if the tab's roles include the user's role.
-    // We cast tab.roles to string[] to satisfy TypeScript's strictness with includes on literal types.
-    return userRole !== null && (tab.roles as string[]).includes(userRole);
+    if (userRole === null) {
+      return false; // If userRole is null, no tabs are visible
+    }
+    // Use the type guard to narrow 'userRole' within this block
+    if (isUserRole(userRole)) {
+      return tab.roles.includes(userRole);
+    }
+    return false; // If userRole is a string but not a valid UserRole
   });
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
 
