@@ -23,25 +23,29 @@ const fetchVehicleDataFromVIN = async (vin: string) => {
   
   const data = await response.json();
 
-  if (data.Results.length === 0) {
+  if (!data.Results || data.Results.length === 0) {
     throw new Error('No results found for this VIN.');
   }
 
-  const errorCode = data.Results.find((r: any) => r.Variable === 'Error Code')?.Value;
+  const getResultValue = (variableName: string) => {
+    const result = data.Results.find((r: any) => r.Variable === variableName);
+    return result ? result.Value : null;
+  };
+
+  const errorCode = getResultValue('Error Code');
+  
+  // If Error Code is not '0', there's an error.
   if (errorCode && errorCode !== '0') {
-    const errorMessage = data.Results.find((r: any) => r.Variable === 'Error Text')?.Value || 'Failed to decode VIN.';
-    // NHTSA API sometimes returns "0" with an error message for invalid VINs, so we check for that too.
-    if (errorMessage.toLowerCase().includes('vin')) {
-        throw new Error(errorMessage);
-    }
+    const errorMessage = getResultValue('Error Text') || 'Failed to decode VIN.';
+    throw new Error(errorMessage);
   }
 
-  const make = data.Results.find((r: any) => r.Variable === 'Make')?.Value || 'N/A';
-  const model = data.Results.find((r: any) => r.Variable === 'Model')?.Value || 'N/A';
-  const year = data.Results.find((r: any) => r.Variable === 'Model Year')?.Value || 'N/A';
+  const make = getResultValue('Make');
+  const model = getResultValue('Model');
+  const year = getResultValue('Model Year');
 
-  if (make === 'N/A' || model === 'N/A' || year === 'N/A') {
-    throw new Error('Could not decode VIN. Please check the VIN and try again.');
+  if (!make || !model || !year) {
+    throw new Error('Could not decode all vehicle details from VIN. Please enter manually.');
   }
 
   return { make, model, year };

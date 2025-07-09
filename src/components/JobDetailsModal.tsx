@@ -364,7 +364,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
               </CardContent>
             </Card>
 
-            {userRole === "mechanic" && (
+            {userRole === "tech" && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Quick Actions</CardTitle>

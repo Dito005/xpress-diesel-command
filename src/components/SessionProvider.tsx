@@ -5,12 +5,12 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 // Define UserRole type here as well, to be consistent with Index.tsx
-type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts" | "unassigned";
+type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
 
 // Type guard function to check if a string is a valid UserRole
 function isUserRole(role: string | null): role is UserRole {
   if (role === null) return false;
-  const validRoles: UserRole[] = ["admin", "manager", "mechanic", "road", "parts", "unassigned"];
+  const validRoles: UserRole[] = ["admin", "manager", "tech", "road", "parts", "unassigned"];
   return (validRoles as string[]).includes(role);
 }
 

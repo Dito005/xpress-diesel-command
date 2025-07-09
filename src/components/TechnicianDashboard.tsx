@@ -186,7 +186,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
 
   return (
     <div className="space-y-6">
-      {userRole === "mechanic" && (
+      {userRole === "tech" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-gradient-to-r from-slate-700 to-slate-800 text-white">
             <CardHeader className="pb-2">
@@ -247,9 +247,9 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
             <Wrench className="h-5 w-5" />
-            {userRole === "mechanic" ? "My Assigned Jobs" : "All Technician Jobs"}
+            {userRole === "tech" ? "My Assigned Jobs" : "All Technician Jobs"}
           </h3>
-          {userRole === "mechanic" && (
+          {userRole === "tech" && (
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
               {technicianJobs.length} Active
             </Badge>
@@ -291,7 +291,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
                   )}
                 </div>
 
-                {userRole === "mechanic" && (
+                {userRole === "tech" && (
                   <div className="flex gap-2 pt-2">
                     <Button 
                       size="sm" 
@@ -332,7 +332,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         </div>
       </div>
 
-      {userRole !== "mechanic" && (
+      {userRole !== "tech" && (
         <div className="text-center py-8 text-gray-500">
           <User className="h-12 w-12 mx-auto mb-3 text-gray-400" />
           <p>Advanced technician management features coming soon...</p>

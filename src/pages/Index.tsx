@@ -25,12 +25,12 @@ import { useSession } from "@/components/SessionProvider";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
-type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts" | "unassigned";
+type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
 
 // Type guard function to check if a string is a valid UserRole
 function isUserRole(role: string | null): role is UserRole {
   if (role === null) return false;
-  const validRoles: UserRole[] = ["admin", "manager", "mechanic", "road", "parts", "unassigned"];
+  const validRoles: UserRole[] = ["admin", "manager", "tech", "road", "parts", "unassigned"];
   return (validRoles as string[]).includes(role);
 }
 
@@ -130,7 +130,7 @@ const Index = () => {
     const labels: Record<UserRole, string> = {
       admin: "Administrator",
       manager: "Service Manager",
-      mechanic: "Technician",
+      tech: "Technician",
       road: "Road Tech",
       parts: "Parts Runner",
       unassigned: "Unassigned Role",
@@ -141,12 +141,12 @@ const Index = () => {
   const TABS_CONFIG: { value: string; label: string; icon: React.ElementType; roles: UserRole[] }[] = [
     { value: "ai-analyzer", label: "AI Mission", icon: Brain, roles: ["admin", "manager", "unassigned"] },
     { value: "jobs", label: "Jobs", icon: Wrench, roles: ["admin", "manager", "unassigned"] },
-    { value: "technician", label: userRole === "mechanic" ? "My Jobs" : "Techs", icon: Users, roles: ["admin", "manager", "mechanic", "unassigned"] },
+    { value: "technician", label: userRole === "tech" ? "My Jobs" : "Techs", icon: Users, roles: ["admin", "manager", "tech", "unassigned"] },
     { value: "parts", label: "Parts", icon: Package, roles: ["admin", "manager", "parts", "unassigned"] },
     { value: "road", label: "Road", icon: MapPin, roles: ["admin", "manager", "road", "unassigned"] },
     { value: "invoicing", label: "Invoicing", icon: Calculator, roles: ["admin", "manager", "unassigned"] },
     { value: "reports", label: "Reports", icon: FileText, roles: ["admin", "manager", "unassigned"] },
-    { value: "parts-lookup", label: "Parts Lookup", icon: Search, roles: ["admin", "manager", "parts", "mechanic", "unassigned"] },
+    { value: "parts-lookup", label: "Parts Lookup", icon: Search, roles: ["admin", "manager", "parts", "tech", "unassigned"] },
     { value: "costs", label: "Costs", icon: Database, roles: ["admin", "manager", "unassigned"] },
     { value: "settings", label: "Settings", icon: Settings, roles: ["admin", "unassigned"] },
   ];
@@ -266,7 +266,7 @@ const Index = () => {
           </TabsContent>
           <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="technician">
-            {userRole === "mechanic" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}
+            {userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}
           </TabsContent>
           <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>
