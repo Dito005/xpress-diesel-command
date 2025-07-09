@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client"; // Changed import pat
 
 export const JobBoard = ({ onJobClick }) => {
   const [jobs, setJobs] = useState([]);
+  const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -69,9 +70,9 @@ export const JobBoard = ({ onJobClick }) => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Live Job Board</h2>
-        <Dialog>
+        <Dialog open={isNewJobModalOpen} onOpenChange={setIsNewJobModalOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsNewJobModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Job
             </Button>
@@ -80,7 +81,7 @@ export const JobBoard = ({ onJobClick }) => {
             <DialogHeader>
               <DialogTitle>Create New Job</DialogTitle>
             </DialogHeader>
-            <NewJobForm />
+            <NewJobForm onSuccess={() => setIsNewJobModalOpen(false)} />
           </DialogContent>
         </Dialog>
       </div>

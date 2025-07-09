@@ -70,7 +70,11 @@ interface CustomerOption {
   usdotNumber?: string;
 }
 
-export const NewJobForm = () => {
+interface NewJobFormProps {
+  onSuccess?: () => void;
+}
+
+export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
   const { toast } = useToast();
   const [isVinLoading, setIsVinLoading] = useState(false);
   const [isUsdotLoading, setIsUsdotLoading] = useState(false);
@@ -300,6 +304,9 @@ export const NewJobForm = () => {
     });
     form.reset();
     setIsSubmitting(false);
+    if (onSuccess) {
+      onSuccess();
+    }
   };
 
   return (
