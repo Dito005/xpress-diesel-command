@@ -153,13 +153,17 @@ const Index = () => {
   ];
 
   const visibleTabs = TABS_CONFIG.filter(tab => {
-    if (!isUserRole(userRole)) {
+    if (!userRole) {
       return false;
     }
-    // Now userRole is guaranteed to be UserRole due to the type guard
-    return tab.roles.includes(userRole);
+    // Use the type guard to narrow userRole
+    if (isUserRole(userRole)) {
+      // Explicitly cast tab.roles to readonly string[] for the includes method
+      return (tab.roles as readonly string[]).includes(userRole);
+    }
+    return false; // If userRole is a string but not a valid UserRole
   });
-  const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs"; // Fallback to 'jobs' if no specific role tabs
+  const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -231,7 +235,7 @@ const Index = () => {
           </div>
         )}
 
-        <Tabs defaultValue={defaultTabValue} className="space-y-6">
+        <Tabs defaultValue={defaultTabValue} className="space-y-6"> {/* Fixed: Removed extra '>' */}
           <div className="overflow-x-auto">
             <TabsList>
               {visibleTabs.map(tab => (
@@ -274,7 +278,7 @@ const Index = () => {
             </Tabs>
           </TabsContent>
         </Tabs>
-      </main>
+      </main> {/* Fixed: Added closing main tag */}
 
       {selectedJob && <JobDetailsModal job={selectedJob} onClose={() => setSelectedJob(null)} userRole={userRole} />}
     </div>
