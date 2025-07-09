@@ -99,6 +99,35 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
     }
   };
 
+  const handleGenerateInvoice = async () => {
+    if (!job?.id || !job.customer_info?.name || !job.description) {
+      toast({ variant: "destructive", title: "Missing Job Details", description: "Cannot generate invoice without complete job info." });
+      return;
+    }
+
+    // Simulate calculating total amount based on job details
+    const estimatedAmount = (job.estimated_hours || 0) * 85 + (job.parts_cost || 0); // Example calculation
+
+    const { error } = await supabase.from('invoices').insert([
+      {
+        job_id: job.id,
+        amount: estimatedAmount,
+        items: { description: job.description }, // Use job description as invoice item
+        paid: false,
+        customer_name: job.customer_info.name, // Assuming these columns exist in invoices table
+        customer_email: job.customer_info.email,
+        status: 'pending'
+      }
+    ]);
+
+    if (error) {
+      toast({ variant: "destructive", title: "Invoice Generation Failed", description: error.message });
+    } else {
+      toast({ title: "Invoice Generated", description: `Invoice for Job ${job.vehicle_info.vin.slice(-6)} created.` });
+      // Optionally update job status to 'invoiced'
+    }
+  };
+
   return (
     <Dialog open={!!job} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -288,6 +317,11 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
+          {(userRole === "admin" || userRole === "manager") && (
+            <Button variant="outline" onClick={handleGenerateInvoice}>
+              Generate Invoice
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
