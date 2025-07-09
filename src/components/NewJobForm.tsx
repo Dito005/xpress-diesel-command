@@ -55,6 +55,7 @@ const formSchema = z.object({
   customerPhone: z.string().min(1, "Customer phone is required"),
   usdotNumber: z.string().optional(),
   company: z.string().optional(),
+  billingAddress: z.string().optional(),
   jobType: z.string().min(1, "Job type is required"),
   customerConcern: z.string().min(10, "Please provide a detailed customer concern"),
   recommendedService: z.string().optional(),
@@ -94,6 +95,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
       customerPhone: "",
       usdotNumber: "",
       company: "",
+      billingAddress: "",
       jobType: "",
       customerConcern: "",
       recommendedService: "",
@@ -250,6 +252,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
         customer_email: values.customerEmail,
         customer_phone: values.customerPhone,
         company: values.company,
+        billing_address: values.billingAddress,
         job_type: values.jobType,
         notes: values.notes,
         customer_concern: values.customerConcern,
@@ -471,11 +474,25 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               control={form.control}
               name="company"
               render={({ field }) => (
-                <FormItem className="md:col-span-2">
+                <FormItem>
                   <FormLabel>Company Name (Optional)</FormLabel>
                   <FormDescription>Auto-filled from USDOT or manually entered.</FormDescription>
                   <FormControl>
                     <Input placeholder="Acme Trucking Inc." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="billingAddress"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Billing Address (Optional)</FormLabel>
+                  <FormDescription>The official billing address for the company.</FormDescription>
+                  <FormControl>
+                    <Textarea placeholder="123 Business Rd, Suite 100, Commerce City, USA" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
