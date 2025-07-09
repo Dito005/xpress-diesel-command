@@ -9,27 +9,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
-// This would be a call to a Supabase Edge Function in a real app
+// This function now calls a Supabase Edge Function named 'vin-lookup'
 const fetchVehicleDataFromVIN = async (vin: string) => {
-  console.log(`Looking up VIN: ${vin}`);
-  // Simulate API call
-  await new Promise(res => setTimeout(res, 1000));
+  const { data, error } = await supabase.functions.invoke('vin-lookup', {
+    body: { vin },
+  });
 
-  // Mock responses for specific VINs
-  const MOCK_DATA: { [key: string]: { make: string; model: string; year: string } } = {
-    "1FDNF4JAXGEB00000": { make: "Ford", model: "F-550", year: "2016" },
-    "1GCHK39K78Z000000": { make: "Chevrolet", model: "Silverado 3500HD", year: "2008" },
-    "3C6TRVFG3JG000000": { make: "RAM", model: "3500", year: "2018" },
-  };
-
-  const vehicle = MOCK_DATA[vin.toUpperCase()];
-
-  if (vehicle) {
-    return vehicle;
-  } else {
-    throw new Error("VIN not found or invalid.");
+  if (error) {
+    // Handle structured errors from the Edge Function
+    if (error instanceof FunctionsHttpError) {
+      const errorMessage = await error.context.json();
+      throw new Error(errorMessage.error || 'An unknown error occurred during VIN lookup.');
+    }
+    // Handle generic errors
+    throw new Error(error.message);
   }
+
+  return data;
 };
 
 const formSchema = z.object({
@@ -73,9 +72,9 @@ export const NewJobForm = () => {
     setIsVinLoading(true);
     try {
       const data = await fetchVehicleDataFromVIN(vin);
-      form.setValue("make", data.make);
-      form.setValue("model", data.model);
-      form.setValue("year", data.year);
+      form.setValue("make", data.make || "");
+      form.setValue("model", data.model || "");
+      form.setValue("year", data.year || "");
       toast({
         title: "VIN Lookup Successful",
         description: `Found a ${data.year} ${data.make} ${data.model}.`,
