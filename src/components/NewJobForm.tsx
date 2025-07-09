@@ -14,19 +14,37 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 const fetchVehicleDataFromVIN = async (vin: string) => {
-  const { data, error } = await supabase.functions.invoke('vin-lookup', {
-    body: { vin },
-  });
+  const nhtsaApiUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinExtended/${vin}?format=json`;
+  
+  const response = await fetch(nhtsaApiUrl);
+  if (!response.ok) {
+    throw new Error('Network response was not ok.');
+  }
+  
+  const data = await response.json();
 
-  if (error) {
-    if (error instanceof FunctionsHttpError) {
-      const errorMessage = await error.context.json();
-      throw new Error(errorMessage.error || 'An unknown error occurred during VIN lookup.');
-    }
-    throw new Error(error.message);
+  if (data.Results.length === 0) {
+    throw new Error('No results found for this VIN.');
   }
 
-  return data;
+  const errorCode = data.Results.find((r: any) => r.Variable === 'Error Code')?.Value;
+  if (errorCode && errorCode !== '0') {
+    const errorMessage = data.Results.find((r: any) => r.Variable === 'Error Text')?.Value || 'Failed to decode VIN.';
+    // NHTSA API sometimes returns "0" with an error message for invalid VINs, so we check for that too.
+    if (errorMessage.toLowerCase().includes('vin')) {
+        throw new Error(errorMessage);
+    }
+  }
+
+  const make = data.Results.find((r: any) => r.Variable === 'Make')?.Value || 'N/A';
+  const model = data.Results.find((r: any) => r.Variable === 'Model')?.Value || 'N/A';
+  const year = data.Results.find((r: any) => r.Variable === 'Model Year')?.Value || 'N/A';
+
+  if (make === 'N/A' || model === 'N/A' || year === 'N/A') {
+    throw new Error('Could not decode VIN. Please check the VIN and try again.');
+  }
+
+  return { make, model, year };
 };
 
 // AI-powered suggestions for customer complaints based on job type
