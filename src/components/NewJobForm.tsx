@@ -345,7 +345,7 @@ export const NewJobForm = () => {
               name="model"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Model</Label>
+                  <FormLabel>Model</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., F-550" {...field} />
                   </FormControl>
@@ -377,10 +377,10 @@ export const NewJobForm = () => {
               name="customerName" // Using customerName field to trigger selection
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel htmlFor="customerSelect">Select Existing Customer (Optional)</FormLabel>
-                  <FormControl> {/* Wrap the Select component with FormControl */}
-                    <Select onValueChange={handleCustomerSelect}>
-                      <SelectTrigger id="customerSelect">
+                  <FormLabel>Select Existing Customer (Optional)</FormLabel> {/* Removed htmlFor as it's handled by FormControl */}
+                  <FormControl>
+                    <Select onValueChange={handleCustomerSelect} value={field.value}> {/* Added value prop */}
+                      <SelectTrigger id="customerSelect"> {/* Ensure this ID is unique if needed */}
                         <SelectValue placeholder="Select a customer" />
                       </SelectTrigger>
                       <SelectContent>
