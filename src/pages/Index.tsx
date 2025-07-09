@@ -158,8 +158,8 @@ const Index = () => {
     }
     // Use the type guard to narrow userRole
     if (isUserRole(userRole)) {
-      // Explicitly cast userRole to UserRole for the comparison within some
-      return tab.roles.some(role => role === (userRole as UserRole));
+      // Explicitly cast tab.roles to string[] for the includes method
+      return (tab.roles as string[]).includes(userRole);
     }
     return false; // If userRole is a string but not a valid UserRole
   });
