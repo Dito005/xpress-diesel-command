@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 const fetchVehicleDataFromVIN = async (vin: string) => {
-  const nhtsaApiUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinExtended/${vin}?format=json`;
+  const nhtsaApiUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`;
   
   const response = await fetch(nhtsaApiUrl);
   if (!response.ok) {
@@ -34,8 +34,7 @@ const fetchVehicleDataFromVIN = async (vin: string) => {
 
   const errorCode = getResultValue('Error Code');
   
-  // If Error Code is not '0', there's an error.
-  if (errorCode && errorCode !== '0') {
+  if (errorCode && errorCode !== '0' && errorCode !== '1') { // Error code '1' can mean partial results, which is often fine
     const errorMessage = getResultValue('Error Text') || 'Failed to decode VIN.';
     throw new Error(errorMessage);
   }
