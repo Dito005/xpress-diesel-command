@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Database, Plus, Edit, DollarSign, Clock, Wrench, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 interface JobTemplate {
   id: string;
@@ -28,8 +28,8 @@ interface JobTemplate {
 
 interface PartCost {
   id: string;
-  part_number: string; // Changed to part_number
-  name: string; // Changed to name
+  part_number: string;
+  name: string;
   cost: number;
   markup: number;
   supplier: string;
@@ -437,15 +437,13 @@ export const BusinessCosts = () => {
                 {['Engine', 'Brake', 'Transmission', 'Electrical'].map((category, index) => (
                   <div key={category} className="flex items-center justify-between">
                     <span className="font-medium">{category}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
-                          style={{ width: `${(4-index) * 25}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-gray-600">{4-index} templates</span>
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full" 
+                        style={{ width: `${(4-index) * 25}%` }}
+                      ></div>
                     </div>
+                    <span className="text-sm text-gray-600">{4-index} templates</span>
                   </div>
                 ))}
               </div>

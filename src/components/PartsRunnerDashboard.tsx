@@ -53,7 +53,8 @@ export const PartsRunnerDashboard = ({ onJobClick }) => {
         partNumber: `PN-${job.id.slice(0,4)}`, // Placeholder
         quantity: Math.floor(Math.random() * 3) + 1,
         urgency: job.priority || 'medium',
-        requestedBy: job.job_assignments.map(assignment => assignment.techs?.name).filter(Boolean).join(', ') || 'Unassigned', // Get assigned tech from job_assignments
+        // Access name from the nested array structure
+        requestedBy: job.job_assignments.map(assignment => assignment.techs?.[0]?.name).filter(Boolean).join(', ') || 'Unassigned', 
         supplier: "Local Supplier", // Placeholder
         estimatedCost: Math.floor(Math.random() * 300) + 50,
         status: job.status === 'waiting_parts' ? 'pending_pickup' : 'out_for_pickup', // Map job status

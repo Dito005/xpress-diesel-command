@@ -46,7 +46,8 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         if (assignError) {
           console.error("Error fetching job assignments:", assignError);
         } else {
-          const names = assignments.map(assign => assign.techs?.name).filter(Boolean).join(', ');
+          // Access name from the nested array structure
+          const names = assignments.map(assign => assign.techs?.[0]?.name).filter(Boolean).join(', ');
           setAssignedTechNames(names);
         }
       }

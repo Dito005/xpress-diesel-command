@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client"; // Changed import pat
 export const RoadServiceDashboard = ({ onJobClick }) => {
   const [roadCalls, setRoadCalls] = useState([]);
   const [techNames, setTechNames] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState(""); // Added searchTerm state
 
   useEffect(() => {
     const fetchRoadCalls = async () => {
@@ -91,6 +92,12 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
     }
   };
 
+  const filteredRequests = roadCalls.filter(request =>
+    request.issue.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    request.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    request.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       {/* Road Service Stats */}
@@ -154,7 +161,7 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Search parts or unit numbers..."
+            placeholder="Search calls by issue, unit, or customer..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -166,70 +173,62 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
         </Button>
       </div>
 
-      {/* Parts Requests */}
+      {/* Road Calls List */}
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          Parts Requests ({filteredRequests.length})
+          <Phone className="h-5 w-5" />
+          Incoming & Active Road Calls ({filteredRequests.length})
         </h3>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredRequests.map((request) => (
-            <Card key={request.id} className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
+          {filteredRequests.map((call) => (
+            <Card key={call.id} className="hover:shadow-lg transition-shadow border-l-4 border-l-red-500">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    {request.unitNumber}
-                    {request.urgency === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                    {call.unitNumber}
+                    {call.priority === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
                   </CardTitle>
                   <div className="flex gap-2">
-                    <Badge className={getUrgencyColor(request.urgency)} variant="outline">
-                      {request.urgency.toUpperCase()}
+                    <Badge className={getPriorityColor(call.priority)} variant="outline">
+                      {call.priority.toUpperCase()}
                     </Badge>
-                    <Badge className={getStatusColor(request.status)} variant="outline">
-                      {request.status === "pending_pickup" ? "Pending" :
-                       request.status === "out_for_pickup" ? "En Route" : "Delivered"}
+                    <Badge className={getStatusColor(call.status)} variant="outline">
+                      {call.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </Badge>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <div className="font-medium text-gray-900">{request.partName}</div>
-                  <div className="text-sm text-gray-600">Part #: {request.partNumber}</div>
-                  <div className="text-sm text-gray-600">Qty: {request.quantity}</div>
+                  <div className="font-medium text-gray-900">{call.issue}</div>
+                  <div className="text-sm text-gray-600">Customer: {call.customerName}</div>
+                  <div className="text-sm text-gray-600">Driver: {call.driverName} ({call.driverPhone})</div>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-gray-600">
-                    Requested by: <span className="font-medium">{request.requestedBy}</span>
+                    Assigned: <span className="font-medium">{call.assignedTech}</span>
                   </div>
-                  <div className="font-medium text-green-600">
-                    ${request.estimatedCost}
+                  <div className="font-medium text-blue-600">
+                    ETA: {call.estimatedArrival}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <MapPin className="h-4 w-4" />
-                  {request.supplier} - {request.location}
+                  {call.location}
                 </div>
 
                 <div className="text-xs text-gray-500">
-                  Requested {request.requestTime}
+                  Call Time: {call.callTime}
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  {request.status === "pending_pickup" && (
-                    <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700">
-                      Start Pickup
-                    </Button>
-                  )}
-                  {request.status === "out_for_pickup" && (
-                    <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700">
-                      Mark Delivered
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => onJobClick({ id: request.jobId })}>
+                  <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700">
+                    Update Status
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => onJobClick({ id: call.id })}>
                     View Job
                   </Button>
                 </div>
