@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { MapPin, Phone, Clock, Navigation, AlertTriangle, Wrench, User } from "lucide-react";
+import { MapPin, Phone, Clock, Navigation, AlertTriangle, Wrench, User, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client"; // Changed import path
 
 export const RoadServiceDashboard = ({ onJobClick }) => {
@@ -13,6 +13,7 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
 
   useEffect(() => {
     const fetchRoadCalls = async () => {
+      // Fetch parts requests (simulated from jobs for now, or a dedicated parts_requests table)
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select(`
@@ -221,7 +222,7 @@ export const RoadServiceDashboard = ({ onJobClick }) => {
                 </div>
 
                 <div className="text-xs text-gray-500">
-                  Call Time: {call.callTime}
+                  Requested {call.requestTime}
                 </div>
 
                 <div className="flex gap-2 pt-2">
