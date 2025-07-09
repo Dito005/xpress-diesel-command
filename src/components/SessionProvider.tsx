@@ -18,7 +18,7 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    const handleAuthStateChange = async (event: string, currentSession: Session | null) => {
       setSession(currentSession);
       if (currentSession) {
         // Fetch user role from public.techs table
@@ -28,44 +28,35 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
           .eq('id', currentSession.user.id)
           .single();
 
-        if (techError && techError.code !== 'PGRST116') { // PGRST116 means no rows found
-          console.error("Error fetching user role:", techError);
-          setUserRole(null); // No role found or error
+        if (techError) {
+          // Log all errors, not just PGRST116, to help diagnose
+          console.error("Error fetching user role from techs table:", techError);
+          if (techError.code === 'PGRST116') { // No rows found
+            setUserRole('unassigned');
+            console.warn(`User ${currentSession.user.id} has no tech profile. Assigning 'unassigned' role.`);
+          } else {
+            // For other errors, default to unassigned but log the specific error
+            setUserRole('unassigned');
+            console.error(`Failed to fetch role for user ${currentSession.user.id}:`, techError.message);
+          }
         } else if (techData) {
           setUserRole(techData.role);
         } else {
-          // If no tech profile, default to a generic role or 'unassigned'
-          setUserRole('unassigned'); 
+          // Fallback if data is null but no explicit error (shouldn't happen with .single())
+          setUserRole('unassigned');
+          console.warn(`User ${currentSession.user.id} tech profile found but role is null or undefined. Assigning 'unassigned' role.`);
         }
       } else {
         setUserRole(null);
       }
-      setIsLoading(false);
-    });
+      setIsLoading(false); // Always set isLoading to false after auth state is processed
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
     // Initial session check
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      setSession(initialSession);
-      if (initialSession) {
-        supabase
-          .from('techs')
-          .select('role')
-          .eq('id', initialSession.user.id)
-          .single()
-          .then(({ data: techData, error: techError }) => {
-            if (techError && techError.code !== 'PGRST116') {
-              console.error("Error fetching initial user role:", techError);
-              setUserRole(null);
-            } else if (techData) {
-              setUserRole(techData.role);
-            } else {
-              setUserRole('unassigned');
-            }
-            setIsLoading(false);
-          });
-      } else {
-        setIsLoading(false);
-      }
+      handleAuthStateChange('INITIAL_SESSION', initialSession); // Process initial session
     });
 
     return () => subscription.unsubscribe();

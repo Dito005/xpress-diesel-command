@@ -26,6 +26,13 @@ import { useToast } from "@/hooks/use-toast";
 
 type UserRole = "admin" | "manager" | "mechanic" | "road" | "parts" | "unassigned";
 
+// Type guard function to check if a string is a valid UserRole
+function isUserRole(role: string | null): role is UserRole {
+  if (role === null) return false;
+  const validRoles: UserRole[] = ["admin", "manager", "mechanic", "road", "parts", "unassigned"];
+  return (validRoles as string[]).includes(role);
+}
+
 const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const { userRole, session } = useSession(); // Get userRole and session from context
@@ -146,11 +153,11 @@ const Index = () => {
   ];
 
   const visibleTabs = TABS_CONFIG.filter(tab => {
-    if (userRole === null) {
+    if (!isUserRole(userRole)) {
       return false;
     }
-    // Use .some() to explicitly check if the userRole string matches any of the roles in the tab's roles array
-    return tab.roles.some(role => role === userRole);
+    // Now userRole is guaranteed to be UserRole due to the type guard
+    return tab.roles.includes(userRole);
   });
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs"; // Fallback to 'jobs' if no specific role tabs
 
