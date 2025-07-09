@@ -156,11 +156,12 @@ const Index = () => {
     if (!userRole) {
       return false;
     }
-    // Capture the narrowed userRole in a local constant to ensure type propagation
-    const currentUserRole: UserRole = userRole; 
-    
-    // Now use currentUserRole in the comparison
-    return tab.roles.some(role => role === currentUserRole);
+    // Apply the type guard here. If true, userRole is now narrowed to UserRole within this block.
+    if (isUserRole(userRole)) {
+      // Now, userRole is correctly inferred as UserRole, so direct comparison is fine.
+      return tab.roles.some((role: UserRole) => role === userRole);
+    }
+    return false; // If userRole is a string but not a valid UserRole
   });
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
 
