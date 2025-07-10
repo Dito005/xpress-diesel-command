@@ -3,93 +3,52 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Play, Pause, CheckCircle, User, Wrench } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useSession } from "@/components/SessionProvider"; // Import useSession
+import { useSession } from "@/components/SessionProvider";
 
 export const TechnicianDashboard = ({ userRole, onJobClick }) => {
   const { toast } = useToast();
   const [technicianJobs, setTechnicianJobs] = useState([]);
   const [currentShiftLog, setCurrentShiftLog] = useState(null);
   const [currentJobLog, setCurrentJobLog] = useState(null);
-  const { session } = useSession(); // Get session from context
-  const [currentTechId, setCurrentTechId] = useState(null); // This will be the ID from public.techs
+  const { session } = useSession();
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!session?.user?.id) return;
-
-      setCurrentTechId(session.user.id); // Assuming auth.uid() is directly used as id in public.techs
-      fetchTechnicianData(session.user.id);
-    };
-    fetchUserData();
-
-    const channel = supabase
-      .channel('technician_dashboard_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, payload => {
-        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
-          fetchTechnicianData(currentTechId);
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, payload => {
-        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
-          fetchTechnicianData(currentTechId);
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, payload => { // Listen to assignment changes
-        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
-          fetchTechnicianData(currentTechId);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [session, currentTechId]); // Depend on session and currentTechId
-
-  const fetchTechnicianData = async (techId) => {
+  const fetchTechnicianData = async (techId: string) => {
     if (!techId) return;
 
-    // Fetch assigned jobs via job_assignments
     const { data: assignmentsData, error: assignmentsError } = await supabase
       .from('job_assignments')
-      .select(`
-        job_id,
-        jobs(*)
-      `)
+      .select(`job_id, jobs(*)`)
       .eq('tech_id', techId);
 
     if (assignmentsError) {
       console.error("Error fetching technician assignments:", assignmentsError);
     } else {
-      // Extract job details from the nested 'jobs' object
       const assignedJobs = assignmentsData.map(assignment => assignment.jobs).filter(Boolean);
       setTechnicianJobs(assignedJobs);
     }
 
-    // Fetch current shift log
     const { data: shiftLog, error: shiftError } = await supabase
       .from('time_logs')
       .select('*')
       .eq('tech_id', techId)
       .is('clock_out', null)
-      .is('job_id', null) // General shift
+      .is('job_id', null)
       .single();
 
-    if (shiftError && shiftError.code !== 'PGRST116') { // PGRST116 means no rows found
+    if (shiftError && shiftError.code !== 'PGRST116') {
       console.error("Error fetching current shift log:", shiftError);
     } else {
       setCurrentShiftLog(shiftLog);
     }
 
-    // Fetch current job log
     const { data: jobLog, error: jobLogError } = await supabase
       .from('time_logs')
       .select('*')
       .eq('tech_id', techId)
       .is('clock_out', null)
-      .not('job_id', 'is', null) // Specific job
+      .not('job_id', 'is', null)
       .single();
 
     if (jobLogError && jobLogError.code !== 'PGRST116') {
@@ -99,14 +58,32 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     }
   };
 
+  useEffect(() => {
+    const techId = session?.user?.id;
+    if (!techId) return;
+
+    fetchTechnicianData(techId);
+
+    const channel = supabase
+      .channel(`technician_dashboard_changes_${techId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => fetchTechnicianData(techId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, () => fetchTechnicianData(techId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, () => fetchTechnicianData(techId))
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session]);
+
   const handleClockInOutShift = async () => {
-    if (!currentTechId) {
+    const techId = session?.user?.id;
+    if (!techId) {
       toast({ variant: "destructive", title: "Error", description: "Technician not identified." });
       return;
     }
 
     if (currentShiftLog) {
-      // Clock out
       const { error } = await supabase
         .from('time_logs')
         .update({ clock_out: new Date().toISOString() })
@@ -116,31 +93,30 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock out." });
       } else {
         toast({ title: "Clocked Out", description: "You have clocked out of your shift." });
-        setCurrentShiftLog(null);
+        fetchTechnicianData(techId);
       }
     } else {
-      // Clock in
       const { error } = await supabase
         .from('time_logs')
-        .insert({ tech_id: currentTechId, clock_in: new Date().toISOString(), type: 'shift' });
+        .insert({ tech_id: techId, clock_in: new Date().toISOString(), type: 'shift' });
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in." });
       } else {
         toast({ title: "Clocked In", description: "You have clocked in for your shift." });
-        fetchTechnicianData(currentTechId); // Re-fetch to get the new log
+        fetchTechnicianData(techId);
       }
     }
   };
 
   const handleClockInOutJob = async (jobId: string) => {
-    if (!currentTechId) {
+    const techId = session?.user?.id;
+    if (!techId) {
       toast({ variant: "destructive", title: "Error", description: "Technician not identified." });
       return;
     }
 
     if (currentJobLog && currentJobLog.job_id === jobId) {
-      // Clock out of current job
       const { error } = await supabase
         .from('time_logs')
         .update({ clock_out: new Date().toISOString() })
@@ -150,11 +126,9 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock out of job." });
       } else {
         toast({ title: "Job Clocked Out", description: "You have clocked out of the job." });
-        setCurrentJobLog(null);
-        // Optionally update job status to 'paused' or similar
+        fetchTechnicianData(techId);
       }
     } else {
-      // Clock in to new job (and clock out of any other job if active)
       if (currentJobLog) {
         await supabase
           .from('time_logs')
@@ -164,13 +138,13 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
 
       const { error } = await supabase
         .from('time_logs')
-        .insert({ tech_id: currentTechId, job_id: jobId, clock_in: new Date().toISOString(), type: 'job' });
+        .insert({ tech_id: techId, job_id: jobId, clock_in: new Date().toISOString(), type: 'job' });
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
       } else {
         toast({ title: "Job Clocked In", description: "You have clocked in to the job." });
-        fetchTechnicianData(currentTechId);
+        fetchTechnicianData(techId);
       }
     }
   };
@@ -223,7 +197,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">N/A</div> {/* Will be calculated from time_logs */}
+              <div className="text-2xl font-bold text-gray-900">N/A</div>
               <div className="text-xs text-gray-500">Efficiency: N/A</div>
             </CardContent>
           </Card>
@@ -236,7 +210,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">N/A</div> {/* Will be calculated from time_logs */}
+              <div className="text-2xl font-bold text-gray-900">N/A</div>
               <div className="text-xs text-gray-500">N/A Completed</div>
             </CardContent>
           </Card>
