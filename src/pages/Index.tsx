@@ -40,7 +40,6 @@ const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
-  const [activeTab, setActiveTab] = useState("jobs");
   const { userRole, session } = useSession();
   const [liveLaborCost, setLiveLaborCost] = useState(0);
   const [totalHourlyRate, setTotalHourlyRate] = useState(0);
@@ -53,6 +52,34 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isAiHelperOpen, setIsAiHelperOpen] = useState(false);
+
+  const TABS_CONFIG: { value: string; label: string; icon: React.ElementType; roles: UserRole[] }[] = [
+    { value: "jobs", label: "Jobs", icon: Wrench, roles: ["admin", "manager", "unassigned"] },
+    { value: "ai-analyzer", label: "AI Mission", icon: Brain, roles: ["admin", "manager", "unassigned"] },
+    { value: "technician", label: userRole === "tech" ? "My Jobs" : "Techs", icon: Users, roles: ["admin", "manager", "tech", "unassigned"] },
+    { value: "parts", label: "Parts", icon: Package, roles: ["admin", "manager", "parts", "unassigned"] },
+    { value: "road", label: "Road", icon: MapPin, roles: ["admin", "manager", "road", "unassigned"] },
+    { value: "invoicing", label: "Invoicing", icon: Calculator, roles: ["admin", "manager", "unassigned"] },
+    { value: "reports", label: "Reports", icon: FileText, roles: ["admin", "manager", "unassigned"] },
+    { value: "parts-lookup", label: "Parts Lookup", icon: Search, roles: ["admin", "manager", "parts", "tech", "unassigned"] },
+    { value: "costs", label: "Costs", icon: Database, roles: ["admin", "manager", "unassigned"] },
+    { value: "settings", label: "Settings", icon: Settings, roles: ["admin", "unassigned"] },
+  ];
+
+  const visibleTabs = TABS_CONFIG.filter(tab => {
+    if (userRole === null) return false;
+    if (isUserRole(userRole)) {
+      return tab.roles.includes(userRole);
+    }
+    return false;
+  });
+  
+  const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
+  const [activeTab, setActiveTab] = useState(defaultTabValue);
+
+  useEffect(() => {
+    setActiveTab(defaultTabValue);
+  }, [defaultTabValue]);
 
   useEffect(() => {
     if (!session) return;
@@ -98,14 +125,11 @@ const Index = () => {
     fetchKpis();
     calculateLaborCost();
     
-    const kpiInterval = setInterval(fetchKpis, 30000);
-
-    const timeLogChannel = supabase.channel('public:time_logs:labor_cost')
+    const kpiChannel = supabase.channel('public:kpi-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchKpis)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, fetchKpis)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, payload => {
-        // Fix for TS2339: Explicitly type the payload records
-        const newRecord = payload.new as { id?: string; type?: string };
-        const oldRecord = payload.old as { id?: string; type?: string };
-        const record = newRecord.id ? newRecord : oldRecord;
+        const record = payload.new as { id?: string; type?: string } || payload.old as { id?: string; type?: string };
         if (record && record.type === 'shift') {
           calculateLaborCost();
         }
@@ -113,8 +137,7 @@ const Index = () => {
       .subscribe();
 
     return () => {
-      clearInterval(kpiInterval);
-      supabase.removeChannel(timeLogChannel);
+      supabase.removeChannel(kpiChannel);
     };
   }, [session]);
 
@@ -191,28 +214,6 @@ const Index = () => {
     return labels[role] || "Unknown Role";
   };
 
-  const TABS_CONFIG: { value: string; label: string; icon: React.ElementType; roles: UserRole[] }[] = [
-    { value: "ai-analyzer", label: "AI Mission", icon: Brain, roles: ["admin", "manager", "unassigned"] },
-    { value: "jobs", label: "Jobs", icon: Wrench, roles: ["admin", "manager", "unassigned"] },
-    { value: "technician", label: userRole === "tech" ? "My Jobs" : "Techs", icon: Users, roles: ["admin", "manager", "tech", "unassigned"] },
-    { value: "parts", label: "Parts", icon: Package, roles: ["admin", "manager", "parts", "unassigned"] },
-    { value: "road", label: "Road", icon: MapPin, roles: ["admin", "manager", "road", "unassigned"] },
-    { value: "invoicing", label: "Invoicing", icon: Calculator, roles: ["admin", "manager", "unassigned"] },
-    { value: "reports", label: "Reports", icon: FileText, roles: ["admin", "manager", "unassigned"] },
-    { value: "parts-lookup", label: "Parts Lookup", icon: Search, roles: ["admin", "manager", "parts", "tech", "unassigned"] },
-    { value: "costs", label: "Costs", icon: Database, roles: ["admin", "manager", "unassigned"] },
-    { value: "settings", label: "Settings", icon: Settings, roles: ["admin", "unassigned"] },
-  ];
-
-  const visibleTabs = TABS_CONFIG.filter(tab => {
-    if (userRole === null) return false;
-    if (isUserRole(userRole)) {
-      return tab.roles.includes(userRole);
-    }
-    return false;
-  });
-  const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
-
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-black/30 backdrop-blur-sm border-b border-primary/20 sticky top-0 z-40">
@@ -285,8 +286,8 @@ const Index = () => {
             </TabsList>
           </div>
           <Suspense fallback={<div className="flex justify-center items-center p-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
-            <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
             <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} onGenerateInvoice={handleGenerateInvoiceFromJob} /></TabsContent>
+            <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
             <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
             <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
             <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>
