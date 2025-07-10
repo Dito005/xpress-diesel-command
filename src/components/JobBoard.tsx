@@ -3,11 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { User, Plus, FilePlus2 } from "lucide-react";
+import { User, Plus } from "lucide-react";
 import { NewJobForm } from "./NewJobForm";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
   const [jobs, setJobs] = useState([]);
@@ -78,7 +77,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
               New Job
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl bg-card/80 backdrop-blur-md border-primary/30">
+          <DialogContent className="max-w-3xl bg-card/80 border-primary/30">
             <DialogHeader>
               <DialogTitle>Create New Job</DialogTitle>
             </DialogHeader>
@@ -100,55 +99,35 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
             
             <div className="space-y-3">
               {statusJobs.map((job) => (
-                <HoverCard key={job.id}>
-                  <HoverCardTrigger asChild>
-                    <Card 
-                      className={`cursor-pointer bg-card/80 backdrop-blur-sm hover:bg-primary/10 transition-all border-l-4 ${getStatusColor(job.status)}`}
-                      onClick={() => onJobClick(job)}
-                    >
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm font-semibold flex items-center gap-2 font-orbitron">
-                            {job.truck_vin.slice(-6)}
-                          </CardTitle>
-                          <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                            {getStatusText(job.status)}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0 space-y-3">
-                        <div className="text-sm font-medium text-foreground">{job.job_type}</div>
-                        <div className="text-xs text-muted-foreground">{job.customer_name}</div>
-                        
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <User className="h-3 w-3" />
-                          {job.assigned_tech_names || 'Unassigned'}
-                        </div>
-                        
-                        <div>
-                          <Progress value={status === 'completed' ? 100 : status === 'in_progress' ? 66 : status === 'waiting_parts' ? 33 : 10} className="h-1" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </HoverCardTrigger>
-                  <HoverCardContent className="w-80 bg-card/80 backdrop-blur-md border-primary/30">
-                    <div className="space-y-2">
-                      <h4 className="font-semibold">{job.job_type} for {job.customer_name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {job.notes || "No notes for this job."}
-                      </p>
-                      <div className="flex items-center pt-2">
-                        <span className="text-xs text-muted-foreground">
-                          Created on {new Date(job.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <Button size="sm" className="w-full mt-2" onClick={(e) => { e.stopPropagation(); onGenerateInvoice(job); }}>
-                        <FilePlus2 className="h-4 w-4 mr-2" />
-                        Add to Invoice
-                      </Button>
+                <Card 
+                  key={job.id}
+                  className={`cursor-pointer bg-card/80 hover:bg-primary/10 transition-all border-l-4 ${getStatusColor(job.status)}`}
+                  onClick={() => onJobClick(job)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2 font-orbitron">
+                        {job.truck_vin.slice(-6)}
+                      </CardTitle>
+                      <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                        {getStatusText(job.status)}
+                      </Badge>
                     </div>
-                  </HoverCardContent>
-                </HoverCard>
+                  </CardHeader>
+                  <CardContent className="pt-0 space-y-3">
+                    <div className="text-sm font-medium text-foreground">{job.job_type}</div>
+                    <div className="text-xs text-muted-foreground">{job.customer_name}</div>
+                    
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <User className="h-3 w-3" />
+                      {job.assigned_tech_names || 'Unassigned'}
+                    </div>
+                    
+                    <div>
+                      <Progress value={status === 'completed' ? 100 : status === 'in_progress' ? 66 : status === 'waiting_parts' ? 33 : 10} className="h-1" />
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>

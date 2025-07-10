@@ -41,8 +41,6 @@ const Index = () => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const { userRole, session } = useSession();
-  const [liveLaborCost, setLiveLaborCost] = useState(0);
-  const [totalHourlyRate, setTotalHourlyRate] = useState(0);
   const [kpiData, setKpiData] = useState({
     pendingJobs: 0,
     todaysProfit: 0,
@@ -102,55 +100,17 @@ const Index = () => {
       setKpiData(prev => ({ ...prev, pendingJobs, activeJobs, todaysProfit }));
     };
 
-    const calculateLaborCost = async () => {
-        const { data: clockedInTechs, error } = await supabase
-            .from('time_logs')
-            .select('techs(hourly_rate)')
-            .is('clock_out', null)
-            .eq('type', 'shift');
-
-        if (error) {
-            console.error("Error fetching clocked in techs:", error);
-            setTotalHourlyRate(0);
-            return;
-        }
-
-        const newTotalRate = clockedInTechs.reduce((sum, log) => {
-            const techProfile = Array.isArray(log.techs) ? log.techs[0] : log.techs;
-            return sum + (techProfile?.hourly_rate || 0);
-        }, 0);
-        setTotalHourlyRate(newTotalRate);
-    };
-
     fetchKpis();
-    calculateLaborCost();
     
     const kpiChannel = supabase.channel('public:kpi-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchKpis)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, fetchKpis)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, payload => {
-        const record = payload.new as { id?: string; type?: string } || payload.old as { id?: string; type?: string };
-        if (record && record.type === 'shift') {
-          calculateLaborCost();
-        }
-      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(kpiChannel);
     };
   }, [session]);
-
-  useEffect(() => {
-    const costPerSecond = totalHourlyRate / 3600;
-    const laborInterval = setInterval(() => {
-      setLiveLaborCost(prev => prev + costPerSecond);
-    }, 1000);
-
-    return () => {
-      clearInterval(laborInterval);
-    };
-  }, [totalHourlyRate]);
 
   const handleJobClick = (job: any) => {
     setSelectedJob(job);
@@ -238,7 +198,7 @@ const Index = () => {
                     <Bot className="h-5 w-5 text-primary" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 bg-card/80 backdrop-blur-md border-primary/30">
+                <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 bg-card/80 border-primary/30">
                   <Suspense fallback={<div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                     <AIHelper />
                   </Suspense>
@@ -260,9 +220,9 @@ const Index = () => {
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-yellow-100 flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Pending Jobs</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-bold">{kpiData.pendingJobs}</div></CardContent>
             </Card>
-            <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-red-100 flex items-center gap-2"><Clock className="h-4 w-4" /> Live Labor Cost</CardTitle></CardHeader>
-              <CardContent><div className="text-3xl font-bold">${liveLaborCost.toFixed(2)}</div></CardContent>
+            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-blue-100 flex items-center gap-2"><Wrench className="h-4 w-4" /> Active Jobs</CardTitle></CardHeader>
+              <CardContent><div className="text-3xl font-bold">{kpiData.activeJobs}</div></CardContent>
             </Card>
             <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-100 flex items-center gap-2"><DollarSign className="h-4 w-4" /> Today's Profit</CardTitle></CardHeader>
