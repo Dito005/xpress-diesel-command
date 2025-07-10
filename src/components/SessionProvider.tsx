@@ -26,50 +26,70 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
   const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
-    const fetchUserRole = async (userId: string) => {
-      const { data: techDataArray, error: techError } = await supabase
-        .from('techs')
-        .select('role')
-        .eq('id', userId)
-        .limit(1);
+    let isMounted = true;
 
-      if (techError) {
-        console.error("Error fetching user role from techs table:", techError);
-        setUserRole('unassigned');
-      } else if (techDataArray && techDataArray.length > 0) {
-        const role = techDataArray[0].role;
-        if (isUserRole(role)) {
-          setUserRole(role.toLowerCase() as UserRole);
+    const fetchUserRole = async (userId: string) => {
+      if (!isMounted) return;
+      
+      try {
+        const { data: techDataArray, error: techError } = await supabase
+          .from('techs')
+          .select('role')
+          .eq('id', userId)
+          .limit(1);
+
+        if (techError) {
+          console.error("Error fetching user role:", techError);
+          setUserRole('unassigned');
+          return;
+        }
+
+        if (techDataArray && techDataArray.length > 0) {
+          const role = techDataArray[0].role;
+          if (isUserRole(role)) {
+            setUserRole(role.toLowerCase() as UserRole);
+          } else {
+            setUserRole('unassigned');
+            console.warn(`Invalid role: ${role}`);
+          }
         } else {
           setUserRole('unassigned');
-          console.warn(`User ${userId} has an invalid role: '${role}'. Assigning 'unassigned' role.`);
         }
-      } else {
+      } catch (error) {
+        console.error("Error in fetchUserRole:", error);
         setUserRole('unassigned');
-        console.warn(`User ${userId} tech profile not found or role is missing. Assigning 'unassigned' role.`);
       }
     };
 
     const setAuthData = async (session: Session | null) => {
+      if (!isMounted) return;
+      
       setIsLoading(true);
       setSession(session);
+      
       if (session) {
         await fetchUserRole(session.user.id);
       } else {
         setUserRole(null);
       }
+      
       setIsLoading(false);
     };
 
+    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthData(session);
+      if (isMounted) setAuthData(session);
     });
 
+    // Auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthData(session);
+      if (isMounted) setAuthData(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   return (
