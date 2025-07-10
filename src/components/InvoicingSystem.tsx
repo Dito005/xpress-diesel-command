@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,18 @@ const invoiceSchema = z.object({
   grandTotal: z.number().min(0.01, "Grand Total must be greater than zero."),
 });
 
+const fetchInvoicingData = async () => {
+  const [invPromise, jobPromise, partPromise, techPromise, settingsPromise] = [
+    supabase.from('invoices').select('*, jobs(*), invoice_parts(*, parts(*)), invoice_labor(*, techs(*)), payments(*)').order('created_at', { ascending: false }),
+    supabase.from('jobs').select('*'),
+    supabase.from('parts').select('*'),
+    supabase.from('techs').select('*'),
+    supabase.from('invoice_settings').select('*').single(),
+  ];
+  const [{ data: invoices }, { data: jobs }, { data: parts }, { data: techs }, { data: invoiceSettings }] = await Promise.all([invPromise, jobPromise, partPromise, techPromise, settingsPromise]);
+  return { invoices: invoices || [], jobs: jobs || [], parts: parts || [], techs: techs || [], invoiceSettings };
+};
+
 interface InvoicingSystemProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
@@ -59,26 +72,18 @@ interface InvoicingSystemProps {
 export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, onOpenEditor }: InvoicingSystemProps) => {
   const { toast } = useToast();
   const { session } = useSession();
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [parts, setParts] = useState<any[]>([]);
-  const [techs, setTechs] = useState<any[]>([]);
-  const [invoiceSettings, setInvoiceSettings] = useState<any>(null);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [totals, setTotals] = useState({ subtotal: 0, tax: 0, grandTotal: 0, ccFee: 0 });
   const [clockedHours, setClockedHours] = useState(0);
   const printRef = useRef(null);
 
+  const { data, isLoading } = useQuery({ queryKey: ['invoicingData'], queryFn: fetchInvoicingData });
+  const { invoices = [], jobs = [], parts = [], techs = [], invoiceSettings = null } = data || {};
+
   const form = useForm<z.infer<typeof invoiceSchema>>({
     resolver: zodResolver(invoiceSchema),
-    defaultValues: {
-      status: 'pending',
-      invoiceDate: new Date().toISOString().substring(0, 10),
-      laborEntries: [],
-      partEntries: [],
-      miscFees: [],
-      grandTotal: 0,
-    },
+    defaultValues: { status: 'pending', invoiceDate: new Date().toISOString().substring(0, 10), laborEntries: [], partEntries: [], miscFees: [], grandTotal: 0 },
   });
 
   const { fields: laborFields, append: appendLabor, remove: removeLabor } = useFieldArray({ control: form.control, name: "laborEntries" });
@@ -89,49 +94,29 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
 
   useEffect(() => {
     if (!invoiceSettings) return;
-
     const laborTotal = watchedValues.laborEntries?.reduce((sum, l) => sum + (l.hoursWorked || 0) * (l.hourlyRate || 0), 0) || 0;
     const partsTotal = watchedValues.partEntries?.reduce((sum, p) => sum + (p.finalPrice || 0), 0) || 0;
     const subtotal = laborTotal + partsTotal;
-
     let taxableBase = 0;
     if (invoiceSettings.tax_applies_to === 'both') taxableBase = subtotal;
     else if (invoiceSettings.tax_applies_to === 'parts') taxableBase = partsTotal;
     else if (invoiceSettings.tax_applies_to === 'labor') taxableBase = laborTotal;
-
     const totalTax = taxableBase * (invoiceSettings.tax_rate / 100);
     const miscFeesTotal = watchedValues.miscFees?.reduce((sum, f) => sum + (f.amount || 0), 0) || 0;
     const totalBeforeCC = subtotal + totalTax + miscFeesTotal;
-    
     let ccFee = 0;
     if (watchedValues.paymentMethod === 'stripe' || watchedValues.paymentMethod === 'cc_physical') {
       ccFee = totalBeforeCC * (invoiceSettings.credit_card_fee_percentage / 100);
     }
-    
     const grandTotal = totalBeforeCC + ccFee;
-
     setTotals({ subtotal, tax: totalTax, grandTotal, ccFee });
     form.setValue('grandTotal', grandTotal);
   }, [watchedValues, invoiceSettings, form]);
 
-  const fetchAllData = async () => {
-    const { data: invData } = await supabase.from('invoices').select('*, jobs(*), invoice_parts(*, parts(*)), invoice_labor(*, techs(*)), payments(*)').order('created_at', { ascending: false });
-    setInvoices(invData || []);
-    const { data: jobData } = await supabase.from('jobs').select('*');
-    setJobs(jobData || []);
-    const { data: partData } = await supabase.from('parts').select('*');
-    setParts(partData || []);
-    const { data: techData } = await supabase.from('techs').select('*');
-    setTechs(techData || []);
-    const { data: settingsData } = await supabase.from('invoice_settings').select('*').single();
-    setInvoiceSettings(settingsData);
-  };
-
   useEffect(() => {
-    fetchAllData();
-    const channel = supabase.channel('invoicing-changes').on('postgres_changes', { event: '*', schema: 'public' }, fetchAllData).subscribe();
+    const channel = supabase.channel('invoicing-changes').on('postgres_changes', { event: '*', schema: 'public' }, () => queryClient.invalidateQueries({ queryKey: ['invoicingData'] })).subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     if (isOpen && editingInvoice) {
@@ -149,94 +134,62 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
         miscFees: editingInvoice.misc_fees || [],
       });
     } else if (!isOpen) {
-      form.reset({
-        status: 'pending',
-        invoiceDate: new Date().toISOString().substring(0, 10),
-        laborEntries: [], partEntries: [], miscFees: [], grandTotal: 0,
-      });
+      form.reset({ status: 'pending', invoiceDate: new Date().toISOString().substring(0, 10), laborEntries: [], partEntries: [], miscFees: [], grandTotal: 0 });
     }
   }, [isOpen, editingInvoice, form]);
+
+  const upsertInvoiceMutation = useMutation({
+    mutationFn: async (values: z.infer<typeof invoiceSchema>) => {
+      const invoicePayload = { job_id: values.jobId, status: values.status, created_at: values.invoiceDate, customer_concern: values.customerConcern, recommended_service: values.recommendedService, actual_service: values.actualService, payment_method: values.paymentMethod, subtotal: totals.subtotal, tax: totals.tax, grand_total: totals.grandTotal, misc_fees: values.miscFees, created_by: session?.user.id };
+      const { data: savedInvoice, error } = values.id ? await supabase.from('invoices').update(invoicePayload).eq('id', values.id).select().single() : await supabase.from('invoices').insert(invoicePayload).select().single();
+      if (error) throw error;
+      await supabase.from('invoice_labor').delete().eq('invoice_id', savedInvoice.id);
+      await supabase.from('invoice_parts').delete().eq('invoice_id', savedInvoice.id);
+      if (values.laborEntries.length > 0) await supabase.from('invoice_labor').insert(values.laborEntries.map(l => ({ ...l, invoice_id: savedInvoice.id })));
+      if (values.partEntries.length > 0) await supabase.from('invoice_parts').insert(values.partEntries.map(p => ({ ...p, invoice_id: savedInvoice.id })));
+      return savedInvoice;
+    },
+    onSuccess: (data) => {
+      toast({ title: "Success", description: `Invoice ${data.id ? 'updated' : 'created'}.` });
+      queryClient.invalidateQueries({ queryKey: ['invoicingData'] });
+      onSuccess();
+    },
+    onError: (error: any) => toast({ variant: "destructive", title: "Error", description: error.message }),
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: async () => {
+      const invoiceHtml = renderToString(<InvoiceTemplate ref={printRef} invoice={editingInvoice} totals={totals} settings={invoiceSettings} companyInfo={{}} />);
+      const { error } = await supabase.functions.invoke('send-invoice-email', { body: { toEmail: editingInvoice.jobs.customer_email, invoiceHtml, invoiceId: editingInvoice.id.slice(0, 8) } });
+      if (error) throw error;
+      await supabase.from('invoices').update({ status: 'sent' }).eq('id', editingInvoice.id);
+    },
+    onSuccess: () => {
+      toast({ title: "Email Sent", description: "Invoice has been sent to the customer." });
+      queryClient.invalidateQueries({ queryKey: ['invoicingData'] });
+      onSuccess();
+    },
+    onError: (error: any) => toast({ variant: "destructive", title: "Email Failed", description: error.message }),
+  });
 
   const handleJobSelect = async (jobId: string) => {
     const selectedJob = jobs.find(j => j.id === jobId);
     if (selectedJob) {
       form.setValue("customerConcern", selectedJob.customer_concern);
       form.setValue("recommendedService", selectedJob.recommended_service);
-      
-      const { data: logs, error } = await supabase.from('time_logs').select('*').eq('job_id', jobId);
-      if (error) console.error("Error fetching time logs for job:", error);
-      else {
-        const totalMs = logs.reduce((sum, log) => sum + (new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime()), 0);
-        setClockedHours(totalMs / 3600000);
-      }
+      const { data: logs } = await supabase.from('time_logs').select('*').eq('job_id', jobId);
+      const totalMs = logs?.reduce((sum, log) => sum + (new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime()), 0) || 0;
+      setClockedHours(totalMs / 3600000);
     }
-  };
-
-  const onSubmit = async (values: z.infer<typeof invoiceSchema>) => {
-    const invoicePayload = {
-      job_id: values.jobId,
-      status: values.status,
-      created_at: values.invoiceDate,
-      customer_concern: values.customerConcern,
-      recommended_service: values.recommendedService,
-      actual_service: values.actualService,
-      payment_method: values.paymentMethod,
-      subtotal: totals.subtotal,
-      tax: totals.tax,
-      grand_total: totals.grandTotal,
-      misc_fees: values.miscFees,
-      created_by: session?.user.id,
-    };
-
-    const { data: savedInvoice, error } = values.id
-      ? await supabase.from('invoices').update(invoicePayload).eq('id', values.id).select().single()
-      : await supabase.from('invoices').insert(invoicePayload).select().single();
-
-    if (error) {
-      toast({ variant: "destructive", title: "Error", description: error.message });
-      return;
-    }
-
-    await supabase.from('invoice_labor').delete().eq('invoice_id', savedInvoice.id);
-    await supabase.from('invoice_parts').delete().eq('invoice_id', savedInvoice.id);
-    if (values.laborEntries.length > 0) await supabase.from('invoice_labor').insert(values.laborEntries.map(l => ({ ...l, invoice_id: savedInvoice.id })));
-    if (values.partEntries.length > 0) await supabase.from('invoice_parts').insert(values.partEntries.map(p => ({ ...p, invoice_id: savedInvoice.id })));
-
-    toast({ title: "Success", description: `Invoice ${values.id ? 'updated' : 'created'}.` });
-    onSuccess();
-    fetchAllData();
   };
 
   const handlePrint = async () => {
     const element = printRef.current;
     if (!element) return;
     const canvas = await html2canvas(element, { scale: 2 });
-    const data = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgProperties = pdf.getImageProperties(data);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProperties.height * pdfWidth) / imgProperties.width;
-    pdf.addImage(data, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), (canvas.height * pdf.internal.pageSize.getWidth()) / canvas.width);
     pdf.save(`invoice-${editingInvoice.id.slice(0, 8)}.pdf`);
-  };
-
-  const handleSendEmail = async () => {
-    const invoiceHtml = renderToString(<InvoiceTemplate ref={printRef} invoice={editingInvoice} totals={totals} settings={invoiceSettings} companyInfo={{}} />);
-    const { error } = await supabase.functions.invoke('send-invoice-email', {
-      body: {
-        toEmail: editingInvoice.jobs.customer_email,
-        invoiceHtml,
-        invoiceId: editingInvoice.id.slice(0, 8),
-      },
-    });
-    if (error) {
-      toast({ variant: "destructive", title: "Email Failed", description: error.message });
-    } else {
-      await supabase.from('invoices').update({ status: 'sent' }).eq('id', editingInvoice.id);
-      toast({ title: "Email Sent", description: "Invoice has been sent to the customer." });
-      fetchAllData();
-      onSuccess();
-    }
   };
 
   const filteredInvoices = invoices.filter(invoice =>
@@ -248,9 +201,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <FileText className="h-6 w-6" /> Invoicing System
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><FileText className="h-6 w-6" /> Invoicing System</h2>
         <Button onClick={() => onOpenEditor(null)}><Plus className="h-4 w-4 mr-2" /> New Invoice</Button>
       </div>
       <div className="relative">
@@ -260,16 +211,14 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
       <Card>
         <CardHeader><CardTitle>All Invoices</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          {filteredInvoices.map((invoice) => (
+          {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : filteredInvoices.map((invoice) => (
             <div key={invoice.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100" onClick={() => onOpenEditor(invoice)}>
               <div>
                 <h3 className="font-semibold">Invoice #{invoice.id?.slice(0, 8)}</h3>
                 <p className="text-sm text-gray-600">{invoice.jobs?.customer_name || 'N/A'}</p>
                 <Badge>{invoice.status}</Badge>
               </div>
-              <div className="text-right">
-                <p className="text-xl font-bold">${invoice.grand_total?.toLocaleString()}</p>
-              </div>
+              <div className="text-right"><p className="text-xl font-bold">${invoice.grand_total?.toLocaleString()}</p></div>
             </div>
           ))}
         </CardContent>
@@ -280,19 +229,9 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
           <DialogHeader><DialogTitle>{editingInvoice ? `Edit Invoice #${editingInvoice.id.slice(0,8)}` : 'Create New Invoice'}</DialogTitle></DialogHeader>
           <div className="overflow-y-auto pr-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-                {/* Form fields... */}
+              <form onSubmit={form.handleSubmit((v) => upsertInvoiceMutation.mutate(v))} className="space-y-6 py-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField control={form.control} name="jobId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Job</FormLabel>
-                      <Select onValueChange={(value) => { field.onChange(value); handleJobSelect(value); }} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a job" /></SelectTrigger></FormControl>
-                        <SelectContent>{jobs.map(job => <SelectItem key={job.id} value={job.id}>{job.truck_vin?.slice(-6)} - {job.job_type}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <FormField control={form.control} name="jobId" render={({ field }) => (<FormItem><FormLabel>Job</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleJobSelect(value); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a job" /></SelectTrigger></FormControl><SelectContent>{jobs.map(job => <SelectItem key={job.id} value={job.id}>{job.truck_vin?.slice(-6)} - {job.job_type}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="invoiceDate" render={({ field }) => (<FormItem><FormLabel>Invoice Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="pending">Pending</SelectItem><SelectItem value="sent">Sent</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                 </div>
@@ -308,7 +247,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                       <div className="col-span-2"><Button type="button" variant="destructive" size="sm" onClick={() => removeLabor(index)}><Trash2 className="h-4 w-4" /></Button></div>
                     </div>
                   ))}
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendLabor({ techId: '', hoursWorked: 1, hourlyRate: invoiceSettings.default_hourly_rate })}>Add Labor</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendLabor({ techId: '', hoursWorked: 1, hourlyRate: invoiceSettings?.default_hourly_rate || 0 })}>Add Labor</Button>
                 </CardContent></Card>
 
                 <Card><CardHeader><CardTitle>Parts</CardTitle></CardHeader><CardContent className="space-y-2">
@@ -322,7 +261,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                       <div className="col-span-1"><Button type="button" variant="destructive" size="sm" onClick={() => removePart(index)}><Trash2 className="h-4 w-4" /></Button></div>
                     </div>
                   ))}
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ partId: '', quantity: 1, unitPrice: 0, markupPercentage: invoiceSettings.default_markup_parts, finalPrice: 0 })}>Add Part</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ partId: '', quantity: 1, unitPrice: 0, markupPercentage: invoiceSettings?.default_markup_parts || 0, finalPrice: 0 })}>Add Part</Button>
                 </CardContent></Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -335,8 +274,8 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                       </div>
                     ))}
                     <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => appendMiscFee({ description: 'Shop Supplies', amount: totals.subtotal * (invoiceSettings.shop_supply_fee_percentage / 100) })}>Add Shop Fee</Button>
-                      <Button type="button" variant="outline" size="sm" onClick={() => appendMiscFee({ description: 'Disposal Fee', amount: invoiceSettings.disposal_fee })}>Add Disposal Fee</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => appendMiscFee({ description: 'Shop Supplies', amount: totals.subtotal * ((invoiceSettings?.shop_supply_fee_percentage || 0) / 100) })}>Add Shop Fee</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => appendMiscFee({ description: 'Disposal Fee', amount: invoiceSettings?.disposal_fee || 0 })}>Add Disposal Fee</Button>
                     </div>
                     <FormField control={form.control} name="paymentMethod" render={({ field }) => (<FormItem className="pt-4"><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="check">Check</SelectItem><SelectItem value="cc_physical">Credit Card (Physical)</SelectItem><SelectItem value="stripe">Credit Card (Online)</SelectItem></SelectContent></Select></FormItem>)} />
                   </CardContent></Card>
@@ -351,12 +290,12 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
 
                 <div className="flex justify-between items-center pt-4 border-t">
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={handlePrint}><Printer className="h-4 w-4 mr-2" /> Print</Button>
-                    <Button type="button" variant="outline" onClick={handleSendEmail}><Mail className="h-4 w-4 mr-2" /> Email</Button>
-                    <Button type="button" variant="outline" onClick={() => form.setValue('status', 'paid')}><CheckCircle className="h-4 w-4 mr-2" /> Mark Paid</Button>
+                    <Button type="button" variant="outline" onClick={handlePrint} disabled={!editingInvoice}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+                    <Button type="button" variant="outline" onClick={() => sendEmailMutation.mutate()} disabled={!editingInvoice || sendEmailMutation.isPending}>{sendEmailMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />} Email</Button>
+                    <Button type="button" variant="outline" onClick={() => form.setValue('status', 'paid')} disabled={!editingInvoice}><CheckCircle className="h-4 w-4 mr-2" /> Mark Paid</Button>
                   </div>
-                  <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Invoice"}
+                  <Button type="submit" disabled={upsertInvoiceMutation.isPending}>
+                    {upsertInvoiceMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Invoice"}
                   </Button>
                 </div>
               </form>
