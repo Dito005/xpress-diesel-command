@@ -100,14 +100,20 @@ const DashboardKpis = () => {
     const laborCostForPaidInvoices = timeLogs
       .filter(tl => jobsForPaidInvoices.includes(tl.job_id) && tl.clock_out && tl.techs)
       .reduce((sum, tl) => {
-        const durationMs = new Date(tl.clock_out).getTime() - new Date(tl.clock_in).getTime();
+        const durationMs = new Date(tl.clock_out!).getTime() - new Date(tl.clock_in).getTime();
         const durationHours = durationMs / 3600000;
-        return sum + (durationHours * (tl.techs as any).hourly_rate);
+        const tech = Array.isArray(tl.techs) ? tl.techs[0] : tl.techs;
+        const rate = tech?.hourly_rate || 0;
+        return sum + (durationHours * rate);
       }, 0);
 
     const partsCostForPaidInvoices = partsUsed
       .filter(pu => jobsForPaidInvoices.includes(pu.job_id) && pu.parts)
-      .reduce((sum, pu) => sum + (pu.quantity * (pu.parts as any).cost), 0);
+      .reduce((sum, pu) => {
+        const part = Array.isArray(pu.parts) ? pu.parts[0] : pu.parts;
+        const cost = part?.cost || 0;
+        return sum + (pu.quantity * cost);
+      }, 0);
 
     const totalCostToday = laborCostForPaidInvoices + partsCostForPaidInvoices;
     const profitToday = revenueToday - totalCostToday;
@@ -115,7 +121,7 @@ const DashboardKpis = () => {
     const hoursClockedToday = timeLogs
       .filter(tl => new Date(tl.clock_in) >= todayStart && tl.clock_out)
       .reduce((sum, tl) => {
-        const durationMs = new Date(tl.clock_out).getTime() - new Date(tl.clock_in).getTime();
+        const durationMs = new Date(tl.clock_out!).getTime() - new Date(tl.clock_in).getTime();
         return sum + (durationMs / 3600000);
       }, 0);
 

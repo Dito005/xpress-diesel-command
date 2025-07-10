@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
   const [technicianJobs, setTechnicianJobs] = useState([]);
   const [currentShiftLog, setCurrentShiftLog] = useState(null);
   const [currentJobLog, setCurrentJobLog] = useState(null);
+  const [todaysLogs, setTodaysLogs] = useState([]);
   const { session } = useSession();
 
   const fetchTechnicianData = async (techId: string) => {
@@ -56,6 +57,20 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     } else {
       setCurrentJobLog(jobLog);
     }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { data: todaysLogsData, error: todaysLogsError } = await supabase
+      .from('time_logs')
+      .select('*, jobs(status)')
+      .eq('tech_id', techId)
+      .gte('clock_in', today.toISOString());
+
+    if (todaysLogsError) {
+      console.error("Error fetching today's logs:", todaysLogsError);
+    } else {
+      setTodaysLogs(todaysLogsData || []);
+    }
   };
 
   useEffect(() => {
@@ -75,6 +90,36 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       supabase.removeChannel(channel);
     };
   }, [session]);
+
+  const { todaysHours, jobsCompletedToday, jobsWorkedOnToday } = useMemo(() => {
+    if (!todaysLogs || todaysLogs.length === 0) {
+      return { todaysHours: '0.0', jobsCompletedToday: 0, jobsWorkedOnToday: 0 };
+    }
+
+    let totalDuration = 0;
+    const workedOnJobIds = new Set<string>();
+    const completedJobIds = new Set<string>();
+    
+    todaysLogs.forEach(log => {
+      if (log.clock_out) {
+        totalDuration += new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime();
+      }
+      if (log.job_id) {
+        workedOnJobIds.add(log.job_id);
+        if (log.jobs?.status === 'completed') {
+            completedJobIds.add(log.job_id);
+        }
+      }
+    });
+
+    const hours = (totalDuration / 3600000).toFixed(1);
+
+    return { 
+      todaysHours: hours, 
+      jobsCompletedToday: completedJobIds.size,
+      jobsWorkedOnToday: workedOnJobIds.size
+    };
+  }, [todaysLogs]);
 
   const handleClockInOutShift = async () => {
     const techId = session?.user?.id;
@@ -197,7 +242,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">N/A</div>
+              <div className="text-2xl font-bold text-gray-900">{todaysHours}h</div>
               <div className="text-xs text-gray-500">Efficiency: N/A</div>
             </CardContent>
           </Card>
@@ -210,8 +255,8 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">N/A</div>
-              <div className="text-xs text-gray-500">N/A Completed</div>
+              <div className="text-2xl font-bold text-gray-900">{jobsWorkedOnToday}</div>
+              <div className="text-xs text-gray-500">{jobsCompletedToday} Completed</div>
             </CardContent>
           </Card>
         </div>
