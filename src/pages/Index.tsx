@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useState, Suspense } from "react";
+import { NavLink, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -16,9 +16,11 @@ import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { FloatingAIHelper } from "@/components/FloatingAIHelper";
-import { DashboardPage } from "./DashboardPage";
-import { ReportsAnalytics } from "@/components/ReportsAnalytics";
-import { ShopSettings } from "@/components/ShopSettings";
+import React from "react";
+
+const DashboardPage = React.lazy(() => import('./DashboardPage').then(module => ({ default: module.DashboardPage })));
+const ReportsAnalytics = React.lazy(() => import('@/components/ReportsAnalytics').then(module => ({ default: module.ReportsAnalytics })));
+const ShopSettings = React.lazy(() => import('@/components/ShopSettings').then(module => ({ default: module.ShopSettings })));
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "tech", "road", "parts", "unassigned"] },
@@ -113,34 +115,6 @@ const Index = () => {
     return item ? item.label : "Dashboard";
   };
 
-  const renderContent = () => {
-    const currentPath = location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`;
-    switch (currentPath) {
-      case '/':
-        return <DashboardPage 
-                  onJobClick={handleJobClick} 
-                  onGenerateInvoice={handleGenerateInvoice}
-                  onOpenInvoiceEditor={handleOpenInvoiceEditor}
-                  isInvoiceEditorOpen={isInvoiceEditorOpen}
-                  setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
-                  editingInvoice={editingInvoice}
-                />;
-      case '/reports':
-        return <ReportsAnalytics />;
-      case '/settings':
-        return <ShopSettings />;
-      default:
-        return <DashboardPage 
-                  onJobClick={handleJobClick} 
-                  onGenerateInvoice={handleGenerateInvoice}
-                  onOpenInvoiceEditor={handleOpenInvoiceEditor}
-                  isInvoiceEditorOpen={isInvoiceEditorOpen}
-                  setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
-                  editingInvoice={editingInvoice}
-                />;
-    }
-  };
-
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
@@ -162,7 +136,22 @@ const Index = () => {
           <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {renderContent()}
+          <Suspense fallback={<LoadingSkeleton />}>
+            <Routes>
+              <Route path="/" element={
+                <DashboardPage 
+                  onJobClick={handleJobClick} 
+                  onGenerateInvoice={handleGenerateInvoice}
+                  onOpenInvoiceEditor={handleOpenInvoiceEditor}
+                  isInvoiceEditorOpen={isInvoiceEditorOpen}
+                  setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
+                  editingInvoice={editingInvoice}
+                />
+              } />
+              <Route path="reports" element={<ReportsAnalytics />} />
+              <Route path="settings" element={<ShopSettings />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
       <FloatingAIHelper />

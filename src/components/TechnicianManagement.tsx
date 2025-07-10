@@ -3,43 +3,86 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin, Trash2 } from "lucide-react";
+import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TechnicianForm, Technician } from "./TechnicianForm";
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+
+const fetchTechnicians = async (): Promise<Technician[]> => {
+  const { data, error } = await supabase.from('techs').select('*');
+  if (error) throw error;
+  return data as Technician[];
+};
 
 export const TechnicianManagement = () => {
   const { toast } = useToast();
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const queryClient = useQueryClient();
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
+  const { data: technicians = [], isLoading } = useQuery({
+    queryKey: ['technicians'],
+    queryFn: fetchTechnicians,
+  });
+
   useEffect(() => {
-    fetchTechnicians();
     const channel = supabase
       .channel('technicians_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, fetchTechnicians)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'techs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['technicians'] });
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [queryClient]);
 
-  const fetchTechnicians = async () => {
-    const { data, error } = await supabase
-      .from('techs')
-      .select('*');
+  const saveMutation = useMutation({
+    mutationFn: async (tech: Technician) => {
+      if (tech.id) {
+        const { error } = await supabase.from('techs').update({ ...tech, updated_at: new Date().toISOString() }).eq('id', tech.id);
+        if (error) throw error;
+        return tech;
+      } else {
+        const { data, error } = await supabase.from('techs').insert({ ...tech, id: crypto.randomUUID() }).select().single();
+        if (error) throw error;
+        return data;
+      }
+    },
+    onSuccess: (data) => {
+      toast({ title: `Technician ${data.id ? 'Updated' : 'Added'}`, description: `${data.name}'s profile has been saved.` });
+      setSelectedTech(null);
+      setShowAddDialog(false);
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error saving technician", description: error.message });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['technicians'] });
+    }
+  });
 
-    if (error) {
-      console.error("Error fetching technicians:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load technicians.",
-      });
-    } else {
-      setTechnicians(data as Technician[]);
+  const deleteMutation = useMutation({
+    mutationFn: async (techId: string) => {
+      const { error } = await supabase.from('techs').delete().eq('id', techId);
+      if (error) throw error;
+    },
+    onSuccess: (_, techId) => {
+      toast({ title: "Technician Deleted", description: `Technician has been removed.` });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error deleting technician", description: error.message });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['technicians'] });
+    }
+  });
+
+  const handleDeleteTechnician = (techId: string, techName: string) => {
+    if (window.confirm(`Are you sure you want to delete ${techName}? This action cannot be undone.`)) {
+      deleteMutation.mutate(techId);
     }
   };
 
@@ -59,84 +102,9 @@ export const TechnicianManagement = () => {
     return 'text-red-600';
   };
 
-  const handleSaveTechnician = async (tech: Technician) => {
-    if (tech.id) {
-      // Update existing technician
-      const { error } = await supabase
-        .from('techs')
-        .update({
-          name: tech.name,
-          role: tech.role,
-          hourly_rate: tech.hourly_rate,
-          phone: tech.phone,
-          email: tech.email,
-          active: tech.active,
-          experience: tech.experience,
-          efficiency: tech.efficiency,
-          location: tech.location,
-          specialties: tech.specialties,
-          certifications: tech.certifications,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tech.id);
-
-      if (error) {
-        toast({ variant: "destructive", title: "Error updating technician", description: error.message });
-      } else {
-        toast({ title: "Technician Updated", description: `${tech.name}'s profile has been updated successfully.` });
-        fetchTechnicians(); // Re-fetch to ensure UI is up-to-date
-      }
-    } else {
-      // Add new technician - this should ideally be linked to auth.users creation
-      // For this demo, we'll simulate adding to the 'techs' table directly.
-      // In a real app, you'd create the auth.user first, then insert into techs with auth.uid()
-      // For now, we'll generate a dummy ID or expect it to be passed if linked to auth.signup
-      const { data: newTechData, error } = await supabase
-        .from('techs')
-        .insert({
-          // In a real app, 'id' would come from auth.uid() after user signup
-          // For this demo, we'll let DB generate if not provided, or use a dummy for testing
-          id: tech.id || crypto.randomUUID(), // Generate a new UUID if not provided (for demo purposes)
-          name: tech.name,
-          role: tech.role,
-          hourly_rate: tech.hourly_rate,
-          phone: tech.phone,
-          email: tech.email,
-          active: tech.active,
-          experience: tech.experience,
-          efficiency: tech.efficiency,
-          location: tech.location,
-          specialties: tech.specialties,
-          certifications: tech.certifications,
-        }).select().single();
-
-
-      if (error) {
-        toast({ variant: "destructive", title: "Error adding technician", description: error.message });
-      } else {
-        toast({ title: "Technician Added", description: `${newTechData.name} has been added to the team.` });
-        fetchTechnicians();
-      }
-    }
-    setSelectedTech(null);
-    setShowAddDialog(false);
-  };
-
-  const handleDeleteTechnician = async (techId: string, techName: string) => {
-    if (window.confirm(`Are you sure you want to delete ${techName}? This action cannot be undone.`)) {
-      const { error } = await supabase
-        .from('techs')
-        .delete()
-        .eq('id', techId);
-
-      if (error) {
-        toast({ variant: "destructive", title: "Error deleting technician", description: error.message });
-      } else {
-        toast({ title: "Technician Deleted", description: `${techName} has been removed.` });
-        fetchTechnicians();
-      }
-    }
-  };
+  if (isLoading) {
+    return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -157,14 +125,14 @@ export const TechnicianManagement = () => {
               <DialogTitle>Add New Technician</DialogTitle>
             </DialogHeader>
             <TechnicianForm
-              onSave={handleSaveTechnician}
+              onSave={(tech) => saveMutation.mutate(tech)}
               onCancel={() => setShowAddDialog(false)}
             />
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Team Overview */}
+      {/* Team Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -177,7 +145,6 @@ export const TechnicianManagement = () => {
             </div>
           </CardContent>
         </Card>
-        
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -189,7 +156,6 @@ export const TechnicianManagement = () => {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -203,7 +169,6 @@ export const TechnicianManagement = () => {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -242,30 +207,15 @@ export const TechnicianManagement = () => {
                   </div>
                   
                   <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      {tech.phone}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      {tech.email}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {tech.location}
-                    </div>
+                    <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{tech.phone}</div>
+                    <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{tech.email}</div>
+                    <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{tech.location}</div>
                   </div>
                   
                   <div className="flex items-center gap-4 mt-2">
-                    <span className="text-sm">
-                      <span className="font-medium">${tech.hourly_rate}/hr</span>
-                    </span>
-                    <span className="text-sm">
-                      <span className="font-medium">{tech.experience} years</span>
-                    </span>
-                    <span className={`text-sm font-medium ${getEfficiencyColor(tech.efficiency)}`}>
-                      {tech.efficiency}% efficiency
-                    </span>
+                    <span className="text-sm"><span className="font-medium">${tech.hourly_rate}/hr</span></span>
+                    <span className="text-sm"><span className="font-medium">{tech.experience} years</span></span>
+                    <span className={`text-sm font-medium ${getEfficiencyColor(tech.efficiency)}`}>{tech.efficiency}% efficiency</span>
                   </div>
                 </div>
                 
@@ -277,13 +227,11 @@ export const TechnicianManagement = () => {
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>Edit Technician</DialogTitle>
-                      </DialogHeader>
+                      <DialogHeader><DialogTitle>Edit Technician</DialogTitle></DialogHeader>
                       {selectedTech && (
                         <TechnicianForm
                           technician={selectedTech}
-                          onSave={handleSaveTechnician}
+                          onSave={(techData) => saveMutation.mutate(techData)}
                           onCancel={() => setSelectedTech(null)}
                         />
                       )}
