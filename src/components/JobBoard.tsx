@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Clock, DollarSign, User, AlertTriangle, Plus } from "lucide-react";
 import { NewJobForm } from "./NewJobForm";
 import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { PendingPayments } from "./PendingPayments";
 
-export const JobBoard = ({ onJobClick }) => {
+export const JobBoard = ({ onJobClick, onInvoiceClick }) => {
   const [jobs, setJobs] = useState([]);
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
 
@@ -132,6 +133,9 @@ export const JobBoard = ({ onJobClick }) => {
             </div>
           </div>
         ))}
+      </div>
+      <div className="mt-8">
+        <PendingPayments onInvoiceClick={onInvoiceClick} />
       </div>
     </div>
   );

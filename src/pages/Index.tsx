@@ -206,7 +206,7 @@ const Index = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {(userRole === "admin" || userRole === "manager" || userRole === "unassigned") && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-yellow-100 flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Pending Jobs</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-bold">{kpiData.pendingJobs}</div></CardContent>
@@ -223,9 +223,6 @@ const Index = () => {
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-purple-100 flex items-center gap-2"><BarChart className="h-4 w-4" /> Live Metrics</CardTitle></CardHeader>
               <CardContent><div className="text-lg font-bold">{kpiData.activeJobs} Active Jobs</div></CardContent>
             </Card>
-            <div className="md:col-span-2 lg:col-span-1">
-              <PendingPayments onInvoiceClick={handleInvoiceClick} />
-            </div>
           </div>
         )}
 
@@ -241,7 +238,7 @@ const Index = () => {
           </div>
 
           <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
-          <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} /></TabsContent>
+          <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} onInvoiceClick={handleInvoiceClick} /></TabsContent>
           <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
           <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>

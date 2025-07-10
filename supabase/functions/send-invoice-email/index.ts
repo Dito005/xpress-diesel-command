@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@1.1.0";
 
@@ -12,6 +13,17 @@ serve(async (req) => {
   }
 
   try {
+    // Check for required environment variables first
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL');
+
+    if (!resendApiKey) {
+      throw new Error('RESEND_API_KEY is not set in environment variables.');
+    }
+    if (!fromEmail) {
+      throw new Error('RESEND_FROM_EMAIL is not set in environment variables. This must be a verified domain in Resend.');
+    }
+
     const { toEmail, customerName, invoiceHtml, payNowLink, invoiceId } = await req.json();
 
     if (!toEmail || !invoiceHtml || !invoiceId) {
@@ -21,10 +33,10 @@ serve(async (req) => {
       });
     }
 
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+    const resend = new Resend(resendApiKey);
 
     const { data, error } = await resend.emails.send({
-      from: 'Xpress Diesel Repair <onboarding@resend.dev>', // Replace with your verified Resend domain
+      from: `Xpress Diesel Repair <${fromEmail}>`,
       to: [toEmail],
       subject: `Your Invoice from Xpress Diesel Repair - #${invoiceId}`,
       html: invoiceHtml,
@@ -32,7 +44,7 @@ serve(async (req) => {
     });
 
     if (error) {
-      console.error('Resend email error:', error);
+      console.error('Resend email error:', JSON.stringify(error, null, 2));
       return new Response(JSON.stringify({ error: error.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
@@ -44,7 +56,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error('Failed to send email:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
