@@ -6,6 +6,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { LoadingSkeleton } from "./components/LoadingSkeleton";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -34,7 +35,9 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
         <BrowserRouter>
-          <AppRoutes />
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
         </BrowserRouter>
         <Toaster />
       </SessionProvider>
