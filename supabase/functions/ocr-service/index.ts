@@ -1,3 +1,4 @@
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // In a real implementation, you would import your OCR provider's library
 // For example: import { ImageAnnotatorClient } from "https://esm.sh/@google-cloud/vision";
