@@ -1,29 +1,32 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, DollarSign, Users, Wrench, MapPin, Plus, Bot, Package, FileText, Calculator, Settings, Database, Brain, Workflow, AlertTriangle, BarChart, Search, LogOut } from "lucide-react";
-import { JobBoard } from "@/components/JobBoard";
-import { TechnicianDashboard } from "@/components/TechnicianDashboard";
-import { JobDetailsModal } from "@/components/JobDetailsModal";
-import { PartsRunnerDashboard } from "@/components/PartsRunnerDashboard";
-import { RoadServiceDashboard } from "@/components/RoadServiceDashboard";
-import { ReportsAnalytics } from "@/components/ReportsAnalytics";
-import { AIHelper } from "@/components/AIHelper";
-import { InvoicingSystem } from "@/components/InvoicingSystem";
-import { ShopSettings } from "@/components/ShopSettings";
-import { TechnicianManagement } from "@/components/TechnicianManagement";
-import { TechnicianList } from "@/components/TechnicianList";
-import { BusinessCosts } from "@/components/BusinessCosts";
-import { AIJobAnalyzer } from "@/components/AIJobAnalyzer";
-import { WorkflowOrchestrator } from "@/components/WorkflowOrchestrator";
-import { PartsLookupTool } from "@/components/PartsLookupTool";
+import { Clock, DollarSign, Users, Wrench, MapPin, Plus, Bot, Package, FileText, Calculator, Settings, Database, Brain, Workflow, AlertTriangle, BarChart, Search, LogOut, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/components/SessionProvider";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+
+// Lazy load components for code splitting and faster initial load
+const JobBoard = React.lazy(() => import("@/components/JobBoard").then(module => ({ default: module.JobBoard })));
+const TechnicianDashboard = React.lazy(() => import("@/components/TechnicianDashboard").then(module => ({ default: module.TechnicianDashboard })));
+const JobDetailsModal = React.lazy(() => import("@/components/JobDetailsModal").then(module => ({ default: module.JobDetailsModal })));
+const PartsRunnerDashboard = React.lazy(() => import("@/components/PartsRunnerDashboard").then(module => ({ default: module.PartsRunnerDashboard })));
+const RoadServiceDashboard = React.lazy(() => import("@/components/RoadServiceDashboard").then(module => ({ default: module.RoadServiceDashboard })));
+const ReportsAnalytics = React.lazy(() => import("@/components/ReportsAnalytics").then(module => ({ default: module.ReportsAnalytics })));
+const AIHelper = React.lazy(() => import("@/components/AIHelper").then(module => ({ default: module.AIHelper })));
+const InvoicingSystem = React.lazy(() => import("@/components/InvoicingSystem").then(module => ({ default: module.InvoicingSystem })));
+const ShopSettings = React.lazy(() => import("@/components/ShopSettings").then(module => ({ default: module.ShopSettings })));
+const TechnicianManagement = React.lazy(() => import("@/components/TechnicianManagement").then(module => ({ default: module.TechnicianManagement })));
+const TechnicianList = React.lazy(() => import("@/components/TechnicianList").then(module => ({ default: module.TechnicianList })));
+const BusinessCosts = React.lazy(() => import("@/components/BusinessCosts").then(module => ({ default: module.BusinessCosts })));
+const AIJobAnalyzer = React.lazy(() => import("@/components/AIJobAnalyzer").then(module => ({ default: module.AIJobAnalyzer })));
+const WorkflowOrchestrator = React.lazy(() => import("@/components/WorkflowOrchestrator").then(module => ({ default: module.WorkflowOrchestrator })));
+const PartsLookupTool = React.lazy(() => import("@/components/PartsLookupTool").then(module => ({ default: module.PartsLookupTool })));
+
 
 type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
 
@@ -40,6 +43,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("jobs");
   const { userRole, session } = useSession();
   const [liveLaborCost, setLiveLaborCost] = useState(0);
+  const [totalHourlyRate, setTotalHourlyRate] = useState(0);
   const [kpiData, setKpiData] = useState({
     pendingJobs: 0,
     todaysProfit: 0,
@@ -80,31 +84,50 @@ const Index = () => {
 
         if (error) {
             console.error("Error fetching clocked in techs:", error);
-            return 0;
+            setTotalHourlyRate(0);
+            return;
         }
 
-        const totalHourlyRate = clockedInTechs.reduce((sum, log) => {
+        const newTotalRate = clockedInTechs.reduce((sum, log) => {
             const techProfile = Array.isArray(log.techs) ? log.techs[0] : log.techs;
             return sum + (techProfile?.hourly_rate || 0);
         }, 0);
-        return totalHourlyRate;
+        setTotalHourlyRate(newTotalRate);
     };
 
     fetchKpis();
+    calculateLaborCost();
     
-    const laborInterval = setInterval(async () => {
-        const totalRate = await calculateLaborCost();
-        const costPerSecond = totalRate / 3600;
-        setLiveLaborCost(prev => prev + costPerSecond);
-    }, 1000);
-
     const kpiInterval = setInterval(fetchKpis, 30000);
+
+    const timeLogChannel = supabase.channel('public:time_logs:labor_cost')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, payload => {
+        // Fix for TS2339: Explicitly type the payload records
+        const newRecord = payload.new as { id?: string; type?: string };
+        const oldRecord = payload.old as { id?: string; type?: string };
+        const record = newRecord.id ? newRecord : oldRecord;
+        if (record && record.type === 'shift') {
+          calculateLaborCost();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(kpiInterval);
+      supabase.removeChannel(timeLogChannel);
+    };
+  }, [session]);
+
+  useEffect(() => {
+    const costPerSecond = totalHourlyRate / 3600;
+    const laborInterval = setInterval(() => {
+      setLiveLaborCost(prev => prev + costPerSecond);
+    }, 1000);
 
     return () => {
       clearInterval(laborInterval);
-      clearInterval(kpiInterval);
     };
-  }, [session]);
+  }, [totalHourlyRate]);
 
   const handleJobClick = (job: any) => {
     setSelectedJob(job);
@@ -215,7 +238,9 @@ const Index = () => {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 bg-card/80 backdrop-blur-md border-primary/30">
-                  <AIHelper />
+                  <Suspense fallback={<div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                    <AIHelper />
+                  </Suspense>
                 </DialogContent>
               </Dialog>
               <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -259,37 +284,40 @@ const Index = () => {
               ))}
             </TabsList>
           </div>
-
-          <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
-          <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} onGenerateInvoice={handleGenerateInvoiceFromJob} /></TabsContent>
-          <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
-          <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
-          <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>
-          <TabsContent value="invoicing">
-            <InvoicingSystem 
-              isOpen={isInvoiceModalOpen}
-              setIsOpen={setIsInvoiceModalOpen}
-              editingInvoice={editingInvoice}
-              onSuccess={() => {
-                setIsInvoiceModalOpen(false);
-                setEditingInvoice(null);
-              }}
-              onOpenEditor={handleOpenInvoiceEditor} 
-            />
-          </TabsContent>
-          <TabsContent value="reports"><ReportsAnalytics /></TabsContent>
-          <TabsContent value="parts-lookup"><PartsLookupTool /></TabsContent>
-          <TabsContent value="costs"><BusinessCosts /></TabsContent>
-          <TabsContent value="settings"><Tabs defaultValue="shop" className="space-y-4"><TabsList><TabsTrigger value="shop">Shop Settings</TabsTrigger><TabsTrigger value="technicians">User Management</TabsTrigger></TabsList><TabsContent value="shop"><ShopSettings /></TabsContent><TabsContent value="technicians"><TechnicianManagement /></TabsContent></Tabs></TabsContent>
+          <Suspense fallback={<div className="flex justify-center items-center p-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
+            <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} onGenerateInvoice={handleGenerateInvoiceFromJob} /></TabsContent>
+            <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
+            <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
+            <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>
+            <TabsContent value="invoicing">
+              <InvoicingSystem 
+                isOpen={isInvoiceModalOpen}
+                setIsOpen={setIsInvoiceModalOpen}
+                editingInvoice={editingInvoice}
+                onSuccess={() => {
+                  setIsInvoiceModalOpen(false);
+                  setEditingInvoice(null);
+                }}
+                onOpenEditor={handleOpenInvoiceEditor} 
+              />
+            </TabsContent>
+            <TabsContent value="reports"><ReportsAnalytics /></TabsContent>
+            <TabsContent value="parts-lookup"><PartsLookupTool /></TabsContent>
+            <TabsContent value="costs"><BusinessCosts /></TabsContent>
+            <TabsContent value="settings"><Tabs defaultValue="shop" className="space-y-4"><TabsList><TabsTrigger value="shop">Shop Settings</TabsTrigger><TabsTrigger value="technicians">User Management</TabsTrigger></TabsList><TabsContent value="shop"><ShopSettings /></TabsContent><TabsContent value="technicians"><TechnicianManagement /></TabsContent></Tabs></TabsContent>
+          </Suspense>
         </Tabs>
       </main>
 
-      <JobDetailsModal 
-        job={selectedJob} 
-        onClose={() => setSelectedJob(null)} 
-        userRole={userRole}
-        onGenerateInvoice={handleGenerateInvoiceFromJob}
-      />
+      <Suspense fallback={<div />}>
+        <JobDetailsModal 
+          job={selectedJob} 
+          onClose={() => setSelectedJob(null)} 
+          userRole={userRole}
+          onGenerateInvoice={handleGenerateInvoiceFromJob}
+        />
+      </Suspense>
     </div>
   );
 };
