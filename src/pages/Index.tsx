@@ -14,7 +14,7 @@ import {
   LogOut,
   Menu,
 } from "lucide-react";
-import { useSession } from "@/components/SessionProvider";
+import { useSession, type UserRole } from "@/components/SessionProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { AIHelper } from "@/components/AIHelper";
 import { JobBoard } from "@/components/JobBoard";
@@ -36,7 +36,12 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
 ];
 
-const Sidebar = ({ userRole, onLinkClick }: { userRole: string, onLinkClick?: () => void }) => {
+interface SidebarProps {
+  userRole: UserRole;
+  onLinkClick?: () => void;
+}
+
+const Sidebar = ({ userRole, onLinkClick }: SidebarProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -86,7 +91,12 @@ const Sidebar = ({ userRole, onLinkClick }: { userRole: string, onLinkClick?: ()
   );
 };
 
-const DashboardContent = ({ onJobClick, userRole }) => {
+interface DashboardContentProps {
+  onJobClick: (job: any) => void;
+  userRole: UserRole;
+}
+
+const DashboardContent = ({ onJobClick, userRole }: DashboardContentProps) => {
   if (userRole === 'tech' || userRole === 'road') {
     return <TechnicianDashboard userRole={userRole} onJobClick={onJobClick} />;
   }

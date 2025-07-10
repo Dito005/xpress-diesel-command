@@ -4,7 +4,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
+export type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
 
 function isUserRole(role: string | null): role is UserRole {
   if (role === null) return false;
