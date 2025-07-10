@@ -21,6 +21,7 @@ import React from "react";
 const DashboardPage = React.lazy(() => import('./DashboardPage').then(module => ({ default: module.DashboardPage })));
 const ReportsAnalytics = React.lazy(() => import('@/components/ReportsAnalytics').then(module => ({ default: module.ReportsAnalytics })));
 const ShopSettings = React.lazy(() => import('@/components/ShopSettings').then(module => ({ default: module.ShopSettings })));
+const TechnicianDashboard = React.lazy(() => import('@/components/TechnicianDashboard').then(module => ({ default: module.TechnicianDashboard })));
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "tech", "road", "parts", "unassigned"] },
@@ -165,14 +166,21 @@ const Index = () => {
           <Suspense fallback={<LoadingSkeleton />}>
             <Routes>
               <Route path="/" element={
-                <DashboardPage 
-                  onJobClick={handleJobClick} 
-                  onGenerateInvoice={handleGenerateInvoice}
-                  onOpenInvoiceEditor={handleOpenInvoiceEditor}
-                  isInvoiceEditorOpen={isInvoiceEditorOpen}
-                  setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
-                  editingInvoice={editingInvoice}
-                />
+                (userRole === 'admin' || userRole === 'manager') ? (
+                  <DashboardPage 
+                    onJobClick={handleJobClick} 
+                    onGenerateInvoice={handleGenerateInvoice}
+                    onOpenInvoiceEditor={handleOpenInvoiceEditor}
+                    isInvoiceEditorOpen={isInvoiceEditorOpen}
+                    setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
+                    editingInvoice={editingInvoice}
+                  />
+                ) : (
+                  <TechnicianDashboard 
+                    userRole={userRole}
+                    onJobClick={handleJobClick}
+                  />
+                )
               } />
               <Route path="reports" element={<ReportsAnalytics />} />
               <Route path="settings" element={<ShopSettings />} />
