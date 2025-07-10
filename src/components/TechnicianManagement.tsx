@@ -133,54 +133,10 @@ export const TechnicianManagement = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Technicians</p>
-                <p className="text-2xl font-bold">{technicians.length}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-500 dark:text-blue-400" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-500">{technicians.filter(t => t.active).length}</p>
-              </div>
-              <Star className="h-8 w-8 text-green-600 dark:text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Efficiency</p>
-                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500">
-                  {technicians.length > 0 ? Math.round(technicians.reduce((sum, t) => sum + t.efficiency, 0) / technicians.length) : 0}%
-                </p>
-              </div>
-              <Clock className="h-8 w-8 text-yellow-600 dark:text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Road Techs</p>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-500">
-                  {technicians.filter(t => t.location === 'road' || t.location === 'both').length}
-                </p>
-              </div>
-              <Wrench className="h-8 w-8 text-purple-600 dark:text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
+        <Card className="bg-card/80 backdrop-blur-sm"><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Total Technicians</p><p className="text-2xl font-bold">{technicians.length}</p></div><Users className="h-8 w-8 text-blue-500 dark:text-blue-400" /></div></CardContent></Card>
+        <Card className="bg-card/80 backdrop-blur-sm"><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Active</p><p className="text-2xl font-bold text-green-600 dark:text-green-500">{technicians.filter(t => t.active).length}</p></div><Star className="h-8 w-8 text-green-600 dark:text-green-500" /></div></CardContent></Card>
+        <Card className="bg-card/80 backdrop-blur-sm"><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Avg Efficiency</p><p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500">{technicians.length > 0 ? Math.round(technicians.reduce((sum, t) => sum + t.efficiency, 0) / technicians.length) : 0}%</p></div><Clock className="h-8 w-8 text-yellow-600 dark:text-yellow-500" /></div></CardContent></Card>
+        <Card className="bg-card/80 backdrop-blur-sm"><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Road Techs</p><p className="text-2xl font-bold text-purple-600 dark:text-purple-500">{technicians.filter(t => t.location === 'road' || t.location === 'both').length}</p></div><Wrench className="h-8 w-8 text-purple-600 dark:text-purple-500" /></div></CardContent></Card>
       </div>
 
       <Card>
@@ -190,7 +146,7 @@ export const TechnicianManagement = () => {
         <CardContent>
           <div className="space-y-4">
             {technicians.map((tech) => (
-              <div key={tech.id} className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
+              <div key={tech.id} className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800/60 rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-semibold">{tech.name}</h3>

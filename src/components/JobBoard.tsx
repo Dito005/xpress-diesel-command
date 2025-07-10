@@ -111,7 +111,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
                 {statusJobs.map((job) => (
                   <Card 
                     key={job.id}
-                    className={`cursor-pointer hover:bg-accent transition-all border-l-4 ${getStatusColor(job.status)}`}
+                    className={`cursor-pointer hover:bg-accent/80 transition-all border-l-4 bg-card/80 backdrop-blur-sm ${getStatusColor(job.status)}`}
                     onClick={() => onJobClick(job)}
                   >
                     <CardHeader className="pb-2">

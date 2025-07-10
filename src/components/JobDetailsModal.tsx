@@ -71,9 +71,9 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
   };
 
   const getProfitColor = (margin) => {
-    if (margin >= 80) return "text-green-600";
-    if (margin >= 60) return "text-yellow-600";
-    return "text-red-600";
+    if (margin >= 80) return "text-green-500";
+    if (margin >= 60) return "text-yellow-500";
+    return "text-red-500";
   };
 
   const handleClockInOutJob = async () => {
@@ -137,10 +137,10 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
 
   return (
     <Dialog open={!!job} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background/95 backdrop-blur-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <Truck className="h-6 w-6 text-blue-600" />
+            <Truck className="h-6 w-6 text-primary" />
             Job Details - {job.truck_vin?.slice(-6) || 'N/A'}
             <Badge className={getStatusColor(job.status)} variant="outline">
               {job.status?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}
@@ -151,7 +151,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column */}
           <div className="space-y-4">
-            <Card>
+            <Card className="bg-card/80">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -161,34 +161,34 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Unit Number</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">Unit Number</Label>
                     <div className="font-semibold">{job.truck_vin?.slice(-6) || 'N/A'}</div>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Job Type</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">Job Type</Label>
                     <div className="font-semibold">{job.job_type || 'N/A'}</div>
                   </div>
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Customer</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Customer</Label>
                   <div className="font-semibold">{job.customer_name || 'N/A'}</div>
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Complaint</Label>
-                  <div className="text-gray-900">{job.customer_concern || job.notes || 'N/A'}</div>
+                  <Label className="text-sm font-medium text-muted-foreground">Complaint</Label>
+                  <div className="text-foreground/90">{job.customer_concern || job.notes || 'N/A'}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Assigned to:</span>
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Assigned to:</span>
                   <span className="font-medium">{assignedTechNames || 'Unassigned'}</span>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-card/80">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Clock className="h-5 w-5" />
@@ -198,24 +198,24 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Estimated Hours</Label>
-                    <div className="text-xl font-bold text-blue-600">{job.estimated_hours || 0}h</div>
+                    <Label className="text-sm font-medium text-muted-foreground">Estimated Hours</Label>
+                    <div className="text-xl font-bold text-blue-500">{job.estimated_hours || 0}h</div>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Clocked Hours</Label>
-                    <div className="text-xl font-bold text-green-600">{job.actual_hours || 0}h</div>
+                    <Label className="text-sm font-medium text-muted-foreground">Clocked Hours</Label>
+                    <div className="text-xl font-bold text-green-500">{job.actual_hours || 0}h</div>
                   </div>
                 </div>
                 
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <div className="text-sm text-gray-600 mb-1">Progress</div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Progress</div>
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                      className="bg-primary h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min(((job.actual_hours || 0) / (job.estimated_hours || 1)) * 100, 100)}%` }}
                     ></div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     {Math.round(((job.actual_hours || 0) / (job.estimated_hours || 1)) * 100)}% Complete
                   </div>
                 </div>
@@ -226,7 +226,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
           {/* Right Column */}
           <div className="space-y-4">
             {(userRole === "admin" || userRole === "manager") && (
-              <Card>
+              <Card className="bg-card/80">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <DollarSign className="h-5 w-5" />
@@ -236,25 +236,25 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Est. Revenue</Label>
-                      <div className="text-xl font-bold text-green-600">
+                      <Label className="text-sm font-medium text-muted-foreground">Est. Revenue</Label>
+                      <div className="text-xl font-bold text-green-500">
                         ${job.estimatedRevenue?.toLocaleString() || '0'}
                       </div>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Actual Cost</Label>
-                      <div className="text-xl font-bold text-red-600">
+                      <Label className="text-sm font-medium text-muted-foreground">Actual Cost</Label>
+                      <div className="text-xl font-bold text-red-500">
                         ${job.actualCost?.toLocaleString() || '0'}
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 p-3 rounded-lg border">
-                    <div className="text-sm text-gray-600 mb-1">Profit Margin</div>
+                  <div className="bg-gradient-to-r from-green-500/10 to-blue-500/10 p-3 rounded-lg border border-border/50">
+                    <div className="text-sm text-muted-foreground mb-1">Profit Margin</div>
                     <div className={`text-2xl font-bold ${getProfitColor(job.profitMargin || 0)}`}>
                       {job.profitMargin || 0}%
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       Net: ${((job.estimatedRevenue || 0) - (job.actualCost || 0)).toLocaleString()}
                     </div>
                   </div>
@@ -262,7 +262,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
               </Card>
             )}
 
-            <Card>
+            <Card className="bg-card/80">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -304,7 +304,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
             </Card>
 
             {userRole === "tech" && (
-              <Card>
+              <Card className="bg-card/80">
                 <CardHeader>
                   <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
@@ -337,7 +337,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
+        <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
           {(userRole === "admin" || userRole === "manager") && (
             <Button variant="outline" onClick={() => onGenerateInvoice(job)}>
               Generate Invoice
@@ -347,7 +347,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
             Close
           </Button>
           {(userRole === "admin" || userRole === "manager") && (
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSaveChanges}>
+            <Button className="bg-primary hover:bg-primary/90" onClick={handleSaveChanges}>
               Save Changes
             </Button>
           )}

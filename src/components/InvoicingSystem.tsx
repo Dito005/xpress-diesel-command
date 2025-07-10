@@ -201,31 +201,31 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><FileText className="h-6 w-6" /> Invoicing System</h2>
+        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2"><FileText className="h-6 w-6" /> Invoicing System</h2>
         <Button onClick={() => onOpenEditor(null)}><Plus className="h-4 w-4 mr-2" /> New Invoice</Button>
       </div>
       <div className="relative">
-        <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
-        <Input placeholder="Search invoices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 w-full md:w-1/2 lg:w-1/3" />
+        <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+        <Input placeholder="Search invoices by ID, customer, or VIN..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 w-full md:w-1/2 lg:w-1/3" />
       </div>
       <Card>
         <CardHeader><CardTitle>All Invoices</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : filteredInvoices.map((invoice) => (
-            <div key={invoice.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100" onClick={() => onOpenEditor(invoice)}>
+            <div key={invoice.id} className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800" onClick={() => onOpenEditor(invoice)}>
               <div>
-                <h3 className="font-semibold">Invoice #{invoice.id?.slice(0, 8)}</h3>
-                <p className="text-sm text-gray-600">{invoice.jobs?.customer_name || 'N/A'}</p>
+                <h3 className="font-semibold text-foreground">Invoice #{invoice.id?.slice(0, 8)}</h3>
+                <p className="text-sm text-muted-foreground">{invoice.jobs?.customer_name || 'N/A'}</p>
                 <Badge>{invoice.status}</Badge>
               </div>
-              <div className="text-right"><p className="text-xl font-bold">${invoice.grand_total?.toLocaleString()}</p></div>
+              <div className="text-right"><p className="text-xl font-bold text-foreground">${invoice.grand_total?.toLocaleString()}</p></div>
             </div>
           ))}
         </CardContent>
       </Card>
       
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh] bg-background/95 backdrop-blur-sm">
           <DialogHeader><DialogTitle>{editingInvoice ? `Edit Invoice #${editingInvoice.id.slice(0,8)}` : 'Create New Invoice'}</DialogTitle></DialogHeader>
           <div className="overflow-y-auto pr-6">
             <Form {...form}>
@@ -237,8 +237,8 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                 </div>
                 <FormField control={form.control} name="actualService" render={({ field }) => (<FormItem><FormLabel>Work Performed</FormLabel><FormControl><Textarea placeholder="Describe work performed..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                 
-                <Card><CardHeader><CardTitle>Labor</CardTitle></CardHeader><CardContent className="space-y-2">
-                  {clockedHours > 0 && <p className="text-sm text-gray-500">Total clocked hours for this job: {clockedHours.toFixed(2)}h</p>}
+                <Card className="bg-card/80"><CardHeader><CardTitle>Labor</CardTitle></CardHeader><CardContent className="space-y-2">
+                  {clockedHours > 0 && <p className="text-sm text-muted-foreground">Total clocked hours for this job: {clockedHours.toFixed(2)}h</p>}
                   {laborFields.map((field, index) => (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-4"><FormField control={form.control} name={`laborEntries.${index}.techId`} render={({ field }) => (<Select onValueChange={(val) => { field.onChange(val); const tech = techs.find(t => t.id === val); if (tech) form.setValue(`laborEntries.${index}.hourlyRate`, tech.hourly_rate || invoiceSettings.default_hourly_rate); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Tech" /></SelectTrigger></FormControl><SelectContent>{techs.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>)} /></div>
@@ -250,7 +250,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                   <Button type="button" variant="outline" size="sm" onClick={() => appendLabor({ techId: '', hoursWorked: 1, hourlyRate: invoiceSettings?.default_hourly_rate || 0 })}>Add Labor</Button>
                 </CardContent></Card>
 
-                <Card><CardHeader><CardTitle>Parts</CardTitle></CardHeader><CardContent className="space-y-2">
+                <Card className="bg-card/80"><CardHeader><CardTitle>Parts</CardTitle></CardHeader><CardContent className="space-y-2">
                   {partFields.map((field, index) => (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-3"><FormField control={form.control} name={`partEntries.${index}.partId`} render={({ field }) => (<Select onValueChange={(val) => { field.onChange(val); const part = parts.find(p => p.id === val); if (part) { form.setValue(`partEntries.${index}.unitPrice`, part.cost); const qty = form.getValues(`partEntries.${index}.quantity`); const markup = form.getValues(`partEntries.${index}.markupPercentage`); form.setValue(`partEntries.${index}.finalPrice`, qty * part.cost * (1 + markup / 100)); } }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Part" /></SelectTrigger></FormControl><SelectContent>{parts.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>)} /></div>
@@ -265,7 +265,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                 </CardContent></Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card><CardHeader><CardTitle>Fees & Payment</CardTitle></CardHeader><CardContent className="space-y-2">
+                  <Card className="bg-card/80"><CardHeader><CardTitle>Fees & Payment</CardTitle></CardHeader><CardContent className="space-y-2">
                     {miscFeeFields.map((field, index) => (
                       <div key={field.id} className="flex gap-2 items-center">
                         <FormField control={form.control} name={`miscFees.${index}.description`} render={({ field }) => (<Input placeholder="Fee description" {...field} />)} />
@@ -279,7 +279,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                     </div>
                     <FormField control={form.control} name="paymentMethod" render={({ field }) => (<FormItem className="pt-4"><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="check">Check</SelectItem><SelectItem value="cc_physical">Credit Card (Physical)</SelectItem><SelectItem value="stripe">Credit Card (Online)</SelectItem></SelectContent></Select></FormItem>)} />
                   </CardContent></Card>
-                  <Card><CardHeader><CardTitle>Summary</CardTitle></CardHeader><CardContent className="space-y-1 text-sm">
+                  <Card className="bg-card/80"><CardHeader><CardTitle>Summary</CardTitle></CardHeader><CardContent className="space-y-1 text-sm">
                     <div className="flex justify-between"><span>Subtotal:</span><span>${totals.subtotal.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span>Tax ({invoiceSettings?.tax_rate}%):</span><span>${totals.tax.toFixed(2)}</span></div>
                     {watchedValues.miscFees?.map((fee, i) => <div key={i} className="flex justify-between"><span>{fee.description}:</span><span>${fee.amount.toFixed(2)}</span></div>)}

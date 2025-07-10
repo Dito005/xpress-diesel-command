@@ -7,13 +7,13 @@ import { Card } from "@/components/ui/card";
 import { DollarSign, Wrench, Users, FileText } from "lucide-react";
 
 const KpiCard = ({ title, value, subtext, icon: Icon, color }) => (
-  <Card className={`p-6 hover:shadow-lg transition-shadow duration-300 ease-in-out hover:shadow-${color}-500/20`}>
+  <Card className={`p-6 hover:shadow-lg transition-shadow duration-300 ease-in-out hover:shadow-${color}-500/20 bg-card/80 backdrop-blur-sm`}>
     <div className="flex items-center justify-between">
       <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-      <Icon className={`h-6 w-6 text-${color}-500`} />
+      <Icon className={`h-6 w-6 text-${color}-600 dark:text-${color}-400`} />
     </div>
     <div className="mt-2">
-      <p className="text-3xl font-bold">{value}</p>
+      <p className="text-3xl font-bold text-foreground">{value}</p>
       <p className="text-xs text-muted-foreground">{subtext}</p>
     </div>
   </Card>

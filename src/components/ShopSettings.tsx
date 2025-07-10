@@ -150,7 +150,7 @@ export const ShopSettings = () => {
         </TabsList>
 
         <TabsContent value="invoicing" className="space-y-4">
-          <Card>
+          <Card className="bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <InvoiceIcon className="h-5 w-5" />
@@ -179,7 +179,7 @@ export const ShopSettings = () => {
         </TabsContent>
 
         <TabsContent value="ai" className="space-y-4">
-          <Card>
+          <Card className="bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" />AI Assistant Settings</CardTitle>
             </CardHeader>
