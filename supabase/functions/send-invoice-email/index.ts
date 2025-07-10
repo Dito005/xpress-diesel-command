@@ -43,7 +43,7 @@ serve(async (req) => {
     if (checkoutError) throw new Error(`Failed to create Stripe checkout session: ${checkoutError.message}`);
     
     const payNowLink = checkoutData.url;
-    const finalHtml = invoiceHtml.replace('<!--PAYMENT_LINK_PLACEHOLDER-->', 
+    const finalHtml = invoiceHtml.replace('<div id="payment-link-placeholder"></div>', 
       `<div style="text-align: center; margin-top: 2rem;">
          <a href="${payNowLink}" style="background-color: #1a1a1a; color: white; padding: 1rem 2rem; text-decoration: none; border-radius: 0.5rem; font-size: 1.2rem;">Pay Now</a>
        </div>`

@@ -128,7 +128,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
       </div>
 
       {/* This placeholder will be replaced by the actual payment link */}
-      <!--PAYMENT_LINK_PLACEHOLDER-->
+      <div id="payment-link-placeholder" />
     </div>
   );
 });

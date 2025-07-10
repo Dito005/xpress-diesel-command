@@ -44,18 +44,24 @@ const fetchDashboardData = async () => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const jobsPromise = supabase.from('jobs').select('id, status');
+  const jobsPromise = supabase.from('jobs').select('id, status, location');
   const invoicesPromise = supabase.from('invoices').select('id, status, job_id');
   const paymentsPromise = supabase.from('payments').select('amount, invoice_id').gte('paid_at', todayStart.toISOString());
   const timeLogsPromise = supabase.from('time_logs').select('clock_in, clock_out, job_id, techs(hourly_rate)');
   const partsUsedPromise = supabase.from('parts_used').select('quantity, job_id, parts(cost)');
 
-  const [{ data: jobs }, { data: invoices }, { data: payments }, { data: timeLogs }, { data: partsUsed }] = await Promise.all([
+  const [
+    { data: jobs, error: jobsError },
+    { data: invoices, error: invoicesError },
+    { data: payments, error: paymentsError },
+    { data: timeLogs, error: timeLogsError },
+    { data: partsUsed, error: partsUsedError }
+  ] = await Promise.all([
     jobsPromise, invoicesPromise, paymentsPromise, timeLogsPromise, partsUsedPromise
   ]);
 
-  if (jobs.error || invoices.error || payments.error || timeLogs.error || partsUsed.error) {
-    console.error("Error fetching dashboard data:", jobs.error || invoices.error || payments.error || timeLogs.error || partsUsed.error);
+  if (jobsError || invoicesError || paymentsError || timeLogsError || partsUsedError) {
+    console.error("Error fetching dashboard data:", jobsError || invoicesError || paymentsError || timeLogsError || partsUsedError);
     throw new Error("Failed to fetch dashboard data");
   }
 
@@ -96,12 +102,12 @@ const DashboardKpis = () => {
       .reduce((sum, tl) => {
         const durationMs = new Date(tl.clock_out).getTime() - new Date(tl.clock_in).getTime();
         const durationHours = durationMs / 3600000;
-        return sum + (durationHours * tl.techs.hourly_rate);
+        return sum + (durationHours * (tl.techs as any).hourly_rate);
       }, 0);
 
     const partsCostForPaidInvoices = partsUsed
       .filter(pu => jobsForPaidInvoices.includes(pu.job_id) && pu.parts)
-      .reduce((sum, pu) => sum + (pu.quantity * pu.parts.cost), 0);
+      .reduce((sum, pu) => sum + (pu.quantity * (pu.parts as any).cost), 0);
 
     const totalCostToday = laborCostForPaidInvoices + partsCostForPaidInvoices;
     const profitToday = revenueToday - totalCostToday;
