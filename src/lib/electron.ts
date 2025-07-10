@@ -1,47 +1,26 @@
-// Add type declaration for window.electronAPI
-declare global {
-  interface Window {
-    electronAPI?: {
-      send: (channel: string, ...args: any[]) => void;
-      on: (channel: string, listener: (...args: any[]) => void) => void;
-      removeListener: (channel: string, listener: (...args: any[]) => void) => void;
-    };
-  }
-}
+// ... (keep existing type declarations and imports)
 
-type IpcRenderer = {
-  send: (channel: string, ...args: any[]) => void;
-  on: (channel: string, listener: (...args: any[]) => void) => void;
-  removeListener: (channel: string, listener: (...args: any[]) => void) => void;
-};
-
-const safeIpc: IpcRenderer = {
-  send: () => {},
-  on: () => {},
-  removeListener: () => {}
-};
-
-const getIpcRenderer = () => {
-  if (typeof window === 'undefined') return null;
+const createSafeIpc = (): IpcMethods => {
+  const ipc = getIpcRenderer();
   
-  try {
-    if (window.require) {
-      return window.require('electron').ipcRenderer;
-    }
-    if (window.electronAPI) {  // Now properly typed
-      return window.electronAPI;
-    }
-  } catch (e) {
-    console.warn('Electron ipcRenderer not available');
-  }
-  return null;
+  return {
+    send: (channel, ...args) => {
+      if (ipc) {
+        ipc.send(channel, ...args);
+      } else {
+        console.log(`[Web] IPC send: ${channel}`, args);
+      }
+    },
+    on: (channel, listener) => {
+      if (ipc) {
+        ipc.on(channel, listener);
+      } else {
+        console.log(`[Web] IPC on: ${channel}`);
+      }
+    },
+    removeListener: (channel, listener) => ipc?.removeListener(channel, listener),
+    isElectron: () => !!ipc
+  };
 };
 
-const ipcRenderer = getIpcRenderer() || safeIpc;
-
-export const electronAPI = {
-  send: ipcRenderer.send.bind(ipcRenderer),
-  on: ipcRenderer.on.bind(ipcRenderer),
-  removeListener: ipcRenderer.removeListener.bind(ipcRenderer),
-  isElectron: () => !!getIpcRenderer()
-};
+export const electronAPI = createSafeIpc();
