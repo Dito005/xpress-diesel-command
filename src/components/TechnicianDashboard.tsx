@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Play, Pause, CheckCircle, User, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "@/components/SessionProvider";
 import { TechnicianTimeLogModal } from "./TechnicianTimeLogModal";
 
