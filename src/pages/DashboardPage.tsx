@@ -1,13 +1,4 @@
-import { useState } from 'react';
-import { InvoicingSystem } from '@/components/InvoicingSystem'; // Corrected named import
-
-interface InvoicingSystemProps {
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-  editingInvoice: any;
-  onSuccess: () => void;
-  onOpenEditor: (invoice: any) => void;
-}
+import { JobBoard } from '@/components/JobBoard'; // Import JobBoard
 
 export const DashboardPage = ({
   onJobClick,
@@ -24,16 +15,16 @@ export const DashboardPage = ({
   setIsInvoiceEditorOpen: (open: boolean) => void;
   editingInvoice: any;
 }) => {
-  // The props passed to DashboardPage now contain the state and handlers
-  // from Index.tsx, so we don't need to redefine them here.
-  // The InvoicingSystem component is rendered conditionally in Index.tsx.
-  // This component will primarily contain the JobBoard and InvoiceList.
-
   return (
-    <>
-      {/* Existing content of DashboardPage (e.g., JobBoard, InvoiceList) */}
-      {/* The InvoicingSystem will be rendered in Index.tsx based on isInvoiceEditorOpen */}
-    </>
+    <div className="space-y-6">
+      <JobBoard onJobClick={onJobClick} onGenerateInvoice={onGenerateInvoice} />
+      
+      {/* Placeholder for InvoiceList or other dashboard content */}
+      <div className="p-6 border rounded-lg bg-card">
+        <h3 className="text-xl font-semibold mb-4">Recent Invoices</h3>
+        <p className="text-muted-foreground">Invoice list coming soon...</p>
+      </div>
+    </div>
   );
 };
 
