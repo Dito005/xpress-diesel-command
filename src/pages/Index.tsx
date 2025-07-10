@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/components/SessionProvider";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { PendingPayments } from "@/components/PendingPayments";
 
 type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
 
@@ -36,6 +37,8 @@ function isUserRole(role: string | null): role is UserRole {
 
 const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [activeTab, setActiveTab] = useState("jobs");
   const { userRole, session } = useSession();
   const [liveLaborCost, setLiveLaborCost] = useState(0);
   const [kpiData, setKpiData] = useState({
@@ -58,13 +61,13 @@ const Index = () => {
       const today = new Date().toISOString().split('T')[0];
       const { data: invoices, error: invoicesError } = await supabase
         .from('invoices')
-        .select('total')
+        .select('grand_total')
         .gte('created_at', `${today}T00:00:00.000Z`);
       if (invoicesError) console.error('Error fetching invoices for KPIs', invoicesError);
 
-      const pendingJobs = jobs?.filter(j => j.status === 'pending' || j.status === 'waiting_parts').length || 0;
+      const pendingJobs = jobs?.filter(j => j.status === 'open' || j.status === 'waiting_parts').length || 0;
       const activeJobs = jobs?.filter(j => j.status === 'in_progress').length || 0;
-      const todaysProfit = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0;
+      const todaysProfit = invoices?.reduce((sum, inv) => sum + inv.grand_total, 0) || 0;
 
       setKpiData(prev => ({ ...prev, pendingJobs, activeJobs, todaysProfit }));
     };
@@ -82,7 +85,7 @@ const Index = () => {
         }
 
         const totalHourlyRate = clockedInTechs.reduce((sum, log) => {
-            const techProfile = log.techs?.[0];
+            const techProfile = Array.isArray(log.techs) ? log.techs[0] : log.techs;
             return sum + (techProfile?.hourly_rate || 0);
         }, 0);
         return totalHourlyRate;
@@ -106,6 +109,14 @@ const Index = () => {
 
   const handleJobClick = (job) => {
     setSelectedJob(job);
+  };
+
+  const handleInvoiceClick = (invoiceId) => {
+    // This will open the invoice in the invoicing system tab
+    setActiveTab("invoicing");
+    // A more advanced implementation could have the invoicing system listen for this ID
+    // and open the edit modal automatically. For now, it just switches tabs.
+    console.log("Opening invoice:", invoiceId);
   };
 
   const handleLogout = async () => {
@@ -152,15 +163,11 @@ const Index = () => {
   ];
 
   const visibleTabs = TABS_CONFIG.filter(tab => {
-    if (userRole === null) {
-      return false; // If userRole is null, no tabs are visible
-    }
-    // Use the type guard to narrow 'userRole' within this block
+    if (userRole === null) return false;
     if (isUserRole(userRole)) {
-      const currentRole: UserRole = userRole; // Explicitly capture the narrowed type
-      return tab.roles.includes(currentRole); // Use .includes() directly
+      return tab.roles.includes(userRole);
     }
-    return false; // If userRole is a string but not a valid UserRole
+    return false;
   });
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
 
@@ -199,51 +206,30 @@ const Index = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {(userRole === "admin" || userRole === "manager" || userRole === "unassigned") && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-yellow-100 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" /> Pending Jobs
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{kpiData.pendingJobs}</div>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-yellow-100 flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Pending Jobs</CardTitle></CardHeader>
+              <CardContent><div className="text-3xl font-bold">{kpiData.pendingJobs}</div></CardContent>
             </Card>
             <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-red-100 flex items-center gap-2">
-                  <Clock className="h-4 w-4" /> Live Labor Cost
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">${liveLaborCost.toFixed(2)}</div>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-red-100 flex items-center gap-2"><Clock className="h-4 w-4" /> Live Labor Cost</CardTitle></CardHeader>
+              <CardContent><div className="text-3xl font-bold">${liveLaborCost.toFixed(2)}</div></CardContent>
             </Card>
             <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-green-100 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" /> Today's Profit
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">${kpiData.todaysProfit.toFixed(2)}</div>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-100 flex items-center gap-2"><DollarSign className="h-4 w-4" /> Today's Profit</CardTitle></CardHeader>
+              <CardContent><div className="text-3xl font-bold">${kpiData.todaysProfit.toFixed(2)}</div></CardContent>
             </Card>
             <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-purple-100 flex items-center gap-2">
-                  <BarChart className="h-4 w-4" /> Live Metrics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-bold">{kpiData.activeJobs} Active Jobs</div>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-purple-100 flex items-center gap-2"><BarChart className="h-4 w-4" /> Live Metrics</CardTitle></CardHeader>
+              <CardContent><div className="text-lg font-bold">{kpiData.activeJobs} Active Jobs</div></CardContent>
             </Card>
+            <div className="md:col-span-2 lg:col-span-1">
+              <PendingPayments onInvoiceClick={handleInvoiceClick} />
+            </div>
           </div>
         )}
 
-        <Tabs defaultValue={defaultTabValue} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList>
               {visibleTabs.map(tab => (
@@ -254,36 +240,16 @@ const Index = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="ai-analyzer">
-            <Tabs defaultValue="analyzer" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger>
-                <TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger>
-              </TabsList>
-              <TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent>
-              <TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent>
-            </Tabs>
-          </TabsContent>
+          <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
           <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} /></TabsContent>
-          <TabsContent value="technician">
-            {userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}
-          </TabsContent>
+          <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
           <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="invoicing"><InvoicingSystem /></TabsContent>
           <TabsContent value="reports"><ReportsAnalytics /></TabsContent>
           <TabsContent value="parts-lookup"><PartsLookupTool /></TabsContent>
           <TabsContent value="costs"><BusinessCosts /></TabsContent>
-          <TabsContent value="settings">
-            <Tabs defaultValue="shop" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="shop">Shop Settings</TabsTrigger>
-                <TabsTrigger value="technicians">User Management</TabsTrigger>
-              </TabsList>
-              <TabsContent value="shop"><ShopSettings /></TabsContent>
-              <TabsContent value="technicians"><TechnicianManagement /></TabsContent>
-            </Tabs>
-          </TabsContent>
+          <TabsContent value="settings"><Tabs defaultValue="shop" className="space-y-4"><TabsList><TabsTrigger value="shop">Shop Settings</TabsTrigger><TabsTrigger value="technicians">User Management</TabsTrigger></TabsList><TabsContent value="shop"><ShopSettings /></TabsContent><TabsContent value="technicians"><TechnicianManagement /></TabsContent></Tabs></TabsContent>
         </Tabs>
       </main>
 
