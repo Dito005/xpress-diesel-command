@@ -15,8 +15,9 @@ const queryClient = new QueryClient();
 const AppRoutes = () => {
   const { session, isLoading, userRole } = useSession(); // We still need session and isLoading here
 
-  // If still loading session data, show skeleton
-  if (isLoading) {
+  // If still loading session data OR userRole is not yet determined, show skeleton
+  // userRole will be null initially, then 'admin', 'tech', or 'unassigned'
+  if (isLoading || userRole === null) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <LoadingSkeleton />
@@ -26,13 +27,19 @@ const AppRoutes = () => {
 
   // If not loading and no session, redirect to login
   if (!session) {
-    return <Navigate to="/login" />;
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} /> {/* Catch all and redirect to login */}
+      </Routes>
+    );
   }
 
   // If session exists and not loading, render the main app (Index)
   return (
     <Routes>
       <Route path="/*" element={<Index />} />
+      <Route path="/login" element={<Navigate to="/" replace />} /> {/* If logged in, redirect from login page */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
