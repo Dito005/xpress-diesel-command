@@ -16,9 +16,10 @@ import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { useToast } from "@/components/ui/use-toast";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { FloatingAIHelper } from "@/components/FloatingAIHelper";
+import { InvoicingSystem } from "@/components/InvoicingSystem"; // Added InvoicingSystem import
 import React from "react";
 
-const DashboardPage = React.lazy(() => import('./DashboardPage').then(module => ({ default: module.DashboardPage })));
+const DashboardPage = React.lazy(() => import('./DashboardPage')); // Changed to default import
 const ReportsAnalytics = React.lazy(() => import('@/components/ReportsAnalytics').then(module => ({ default: module.ReportsAnalytics })));
 const ShopSettings = React.lazy(() => import('@/components/ShopSettings').then(module => ({ default: module.ShopSettings })));
 const TechnicianDashboard = React.lazy(() => import('@/components/TechnicianDashboard').then(module => ({ default: module.TechnicianDashboard })));
@@ -195,6 +196,15 @@ const Index = () => {
           onClose={() => setSelectedJob(null)}
           userRole={userRole}
           onGenerateInvoice={handleGenerateInvoice}
+        />
+      )}
+      {isInvoiceEditorOpen && (
+        <InvoicingSystem
+          isOpen={isInvoiceEditorOpen}
+          setIsOpen={setIsInvoiceEditorOpen}
+          editingInvoice={editingInvoice}
+          onSuccess={() => setIsInvoiceEditorOpen(false)}
+          onOpenEditor={handleOpenInvoiceEditor}
         />
       )}
     </div>
