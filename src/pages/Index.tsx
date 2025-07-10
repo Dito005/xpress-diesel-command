@@ -191,26 +191,30 @@ const Index = () => {
   const defaultTabValue = visibleTabs.length > 0 ? visibleTabs[0].value : "jobs";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
+    <div className="min-h-screen bg-background">
+      <header className="bg-black/30 backdrop-blur-sm border-b border-primary/20 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="text-center">
-              <h1 className="text-xl font-bold text-gray-900">Xpress Repair Software</h1>
+              <h1 className="text-xl font-bold text-primary glow-hover cursor-pointer">Xpress Diesel Neo</h1>
             </div>
             <div className="flex items-center space-x-4">
               {userRole && (
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                <Badge variant="outline" className="border-secondary text-secondary flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
                   {getRoleLabel(userRole)}
                 </Badge>
               )}
               <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <Bot className="h-5 w-5" />
+                  <Button variant="outline" size="icon" className="glow-hover">
+                    <Bot className="h-5 w-5 text-primary" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0">
+                <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 bg-card/80 backdrop-blur-md border-primary/30">
                   <AIHelper />
                 </DialogContent>
               </Dialog>
@@ -247,9 +251,9 @@ const Index = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="overflow-x-auto">
-            <TabsList>
+            <TabsList className="bg-black/30 border border-primary/20 p-1 rounded-lg">
               {visibleTabs.map(tab => (
-                <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 data-[state=active]:bg-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/50">
                   <tab.icon className="h-4 w-4" /> {tab.label}
                 </TabsTrigger>
               ))}
@@ -257,7 +261,7 @@ const Index = () => {
           </div>
 
           <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
-          <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} /></TabsContent>
+          <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} onGenerateInvoice={handleGenerateInvoiceFromJob} /></TabsContent>
           <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
           <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>

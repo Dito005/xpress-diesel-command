@@ -3,11 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { User, Plus } from "lucide-react";
+import { User, Plus, FilePlus2 } from "lucide-react";
 import { NewJobForm } from "./NewJobForm";
 import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
-export const JobBoard = ({ onJobClick }) => {
+export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
   const [jobs, setJobs] = useState([]);
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
 
@@ -46,11 +48,11 @@ export const JobBoard = ({ onJobClick }) => {
 
   const getStatusColor = (status) => {
     switch(status) {
-      case "open": return "bg-gray-100 text-gray-800 border-gray-300";
-      case "in_progress": return "bg-blue-100 text-blue-800 border-blue-300";
-      case "waiting_parts": return "bg-yellow-100 text-yellow-800 border-yellow-300";
-      case "completed": return "bg-green-100 text-green-800 border-green-300";
-      default: return "bg-gray-100 text-gray-800 border-gray-300";
+      case "open": return "border-gray-500";
+      case "in_progress": return "border-primary animate-pulse";
+      case "waiting_parts": return "border-yellow-500";
+      case "completed": return "border-accent";
+      default: return "border-gray-500";
     }
   };
 
@@ -68,15 +70,15 @@ export const JobBoard = ({ onJobClick }) => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Live Job Board</h2>
+        <h2 className="text-2xl font-bold text-foreground">Live Job Board</h2>
         <Dialog open={isNewJobModalOpen} onOpenChange={setIsNewJobModalOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsNewJobModalOpen(true)}>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 glow-hover" onClick={() => setIsNewJobModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Job
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl bg-card/80 backdrop-blur-md border-primary/30">
             <DialogHeader>
               <DialogTitle>Create New Job</DialogTitle>
             </DialogHeader>
@@ -88,45 +90,65 @@ export const JobBoard = ({ onJobClick }) => {
         {Object.entries(jobsByStatus).map(([status, statusJobs]) => (
           <div key={status} className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 capitalize">
+              <h3 className="font-semibold text-foreground capitalize">
                 {getStatusText(status)}
               </h3>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs border-primary/50 text-primary">
                 {statusJobs.length}
               </Badge>
             </div>
             
             <div className="space-y-3">
               {statusJobs.map((job) => (
-                <Card 
-                  key={job.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-blue-500"
-                  onClick={() => onJobClick(job)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        {job.truck_vin.slice(-6)}
-                      </CardTitle>
-                      <Badge className={getStatusColor(job.status)} variant="outline">
-                        {getStatusText(job.status)}
-                      </Badge>
+                <HoverCard key={job.id}>
+                  <HoverCardTrigger asChild>
+                    <Card 
+                      className={`cursor-pointer bg-card/80 backdrop-blur-sm hover:bg-primary/10 transition-all border-l-4 ${getStatusColor(job.status)}`}
+                      onClick={() => onJobClick(job)}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2 font-orbitron">
+                            {job.truck_vin.slice(-6)}
+                          </CardTitle>
+                          <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                            {getStatusText(job.status)}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0 space-y-3">
+                        <div className="text-sm font-medium text-foreground">{job.job_type}</div>
+                        <div className="text-xs text-muted-foreground">{job.customer_name}</div>
+                        
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <User className="h-3 w-3" />
+                          {job.assigned_tech_names || 'Unassigned'}
+                        </div>
+                        
+                        <div>
+                          <Progress value={status === 'completed' ? 100 : status === 'in_progress' ? 66 : status === 'waiting_parts' ? 33 : 10} className="h-1" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 bg-card/80 backdrop-blur-md border-primary/30">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold">{job.job_type} for {job.customer_name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {job.notes || "No notes for this job."}
+                      </p>
+                      <div className="flex items-center pt-2">
+                        <span className="text-xs text-muted-foreground">
+                          Created on {new Date(job.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <Button size="sm" className="w-full mt-2" onClick={(e) => { e.stopPropagation(); onGenerateInvoice(job); }}>
+                        <FilePlus2 className="h-4 w-4 mr-2" />
+                        Add to Invoice
+                      </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-0 space-y-2">
-                    <div className="text-sm font-medium text-gray-900">{job.job_type}</div>
-                    <div className="text-xs text-gray-600">{job.customer_name}</div>
-                    
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <User className="h-3 w-3" />
-                      {job.assigned_tech_names || 'Unassigned'}
-                    </div>
-                    
-                    <div className="text-xs text-gray-500 line-clamp-2">
-                      {job.notes}
-                    </div>
-                  </CardContent>
-                </Card>
+                  </HoverCardContent>
+                </HoverCard>
               ))}
             </div>
           </div>
