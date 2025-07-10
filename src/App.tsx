@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'; // Added useEffect import
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,9 +13,10 @@ import { electronAPI } from "@/lib/electron";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { session, isLoading } = useSession();
+  const { session, isLoading, userRole } = useSession(); // Get userRole here
 
-  if (isLoading) {
+  // Wait until both isLoading is false AND userRole is not null
+  if (isLoading || userRole === null) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <LoadingSkeleton />
@@ -41,7 +42,7 @@ const App = () => {
       electronAPI.on('app-close', handleAppClose);
       
       return () => {
-        electronAPI.removeListener('app-close', handleAppClose); // Fixed: Added listener argument
+        electronAPI.removeListener('app-close', handleAppClose);
       };
     }
   }, []);
