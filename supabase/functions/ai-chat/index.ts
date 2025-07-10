@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import OpenAI from 'https://esm.sh/openai@4.52.7';
@@ -87,10 +88,12 @@ serve(async (req) => {
     };
 
     // 6. Log and return response
-    await supabaseAdmin.from('ai_chat_logs').insert([
-      { user_id: userId, session_id: sessionId, role: 'user', prompt: prompt },
-      { user_id: userId, session_id: sessionId, role: 'assistant', response: responsePayload },
-    ]);
+    await supabaseAdmin.from('ai_chat_logs').insert({
+      user_id: userId,
+      session_id: sessionId,
+      prompt: prompt,
+      response: responsePayload,
+    });
 
     return new Response(JSON.stringify(responsePayload), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
