@@ -122,39 +122,39 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-slate-900/95 backdrop-blur-sm border-slate-800 text-slate-200">
+      <DialogContent className="max-w-4xl bg-background/95 backdrop-blur-sm">
         <DialogHeader>
-          <DialogTitle className="text-slate-100">Time Logs for {technician.name}</DialogTitle>
+          <DialogTitle>Time Logs for {technician.name}</DialogTitle>
         </DialogHeader>
-        <div className="py-4 space-y-4">
+        <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto pr-2">
           <div className="flex justify-end">
             <Button onClick={() => setIsAdding(!isAdding)}><Plus className="h-4 w-4 mr-2" /> Add Time Log</Button>
           </div>
 
           {isAdding && (
-            <div className="p-4 border border-slate-700 rounded-lg space-y-4 bg-slate-800/50">
-              <h3 className="font-semibold text-slate-100">Add New Log</h3>
+            <div className="p-4 border rounded-lg space-y-4 bg-card/80">
+              <h3 className="font-semibold">Add New Log</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div><Label className="text-slate-400">Job/Task</Label><select value={newLog.jobId} onChange={(e) => setNewLog(p => ({ ...p, jobId: e.target.value }))} className="w-full p-2 border rounded-md bg-slate-800 border-slate-600 text-slate-200"><option value="">General Shift</option>{jobs.map(job => (<option key={job.id} value={job.id}>{job.job_type} ({job.truck_vin?.slice(-6) || 'N/A'})</option>))}</select></div>
-                <div><Label className="text-slate-400">Notes</Label><Input placeholder="e.g., Lunch break, Diagnostic" value={newLog.notes} onChange={(e) => setNewLog(p => ({ ...p, notes: e.target.value }))} className="bg-slate-800 border-slate-600" /></div>
-                <div><Label className="text-slate-400">Clock In</Label><Input type="datetime-local" value={newLog.clockIn} onChange={(e) => setNewLog(p => ({ ...p, clockIn: e.target.value }))} className="bg-slate-800 border-slate-600" /></div>
-                <div><Label className="text-slate-400">Clock Out</Label><Input type="datetime-local" value={newLog.clockOut} onChange={(e) => setNewLog(p => ({ ...p, clockOut: e.target.value }))} className="bg-slate-800 border-slate-600" /></div>
+                <div><Label>Job/Task</Label><Select value={newLog.jobId} onValueChange={(e) => setNewLog(p => ({ ...p, jobId: e }))}><SelectTrigger><SelectValue placeholder="General Shift" /></SelectTrigger><SelectContent>{jobs.map(job => (<SelectItem key={job.id} value={job.id}>{job.job_type} ({job.truck_vin?.slice(-6) || 'N/A'})</SelectItem>))}</SelectContent></Select></div>
+                <div><Label>Notes</Label><Input placeholder="e.g., Lunch break, Diagnostic" value={newLog.notes} onChange={(e) => setNewLog(p => ({ ...p, notes: e.target.value }))} /></div>
+                <div><Label>Clock In</Label><Input type="datetime-local" value={newLog.clockIn} onChange={(e) => setNewLog(p => ({ ...p, clockIn: e.target.value }))} /></div>
+                <div><Label>Clock Out</Label><Input type="datetime-local" value={newLog.clockOut} onChange={(e) => setNewLog(p => ({ ...p, clockOut: e.target.value }))} /></div>
               </div>
               <Button size="sm" onClick={handleAddLog}><Save className="h-4 w-4 mr-2" /> Save Log</Button>
             </div>
           )}
 
-          <div className="border border-slate-800 rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow className="border-slate-800 hover:bg-slate-800/50"><TableHead className="text-slate-300">Job/Task</TableHead><TableHead className="text-slate-300">Clock In</TableHead><TableHead className="text-slate-300">Clock Out</TableHead><TableHead className="text-slate-300">Duration</TableHead><TableHead className="text-slate-300">Notes</TableHead><TableHead className="text-slate-300 text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Job/Task</TableHead><TableHead>Clock In</TableHead><TableHead>Clock Out</TableHead><TableHead>Duration</TableHead><TableHead>Notes</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {timeLogs.map(log => (
-                  <TableRow key={log.id} className="border-slate-800">
-                    <TableCell className="text-slate-300">{log.jobs ? `${log.jobs.job_type} (${log.jobs.truck_vin?.slice(-6) || 'N/A'})` : 'General Shift'}</TableCell>
-                    <TableCell>{editingLog?.id === log.id ? <Input type="datetime-local" value={editingLog.clock_in ? new Date(editingLog.clock_in).toISOString().substring(0, 16) : ''} onChange={e => setEditingLog({...editingLog, clock_in: e.target.value})} className="bg-slate-800 border-slate-600" /> : <span className="text-slate-300">{new Date(log.clock_in).toLocaleString()}</span>}</TableCell>
-                    <TableCell>{editingLog?.id === log.id ? <Input type="datetime-local" value={editingLog.clock_out ? new Date(editingLog.clock_out).toISOString().substring(0, 16) : ''} onChange={e => setEditingLog({...editingLog, clock_out: e.target.value})} className="bg-slate-800 border-slate-600" /> : <span className="text-slate-300">{log.clock_out ? new Date(log.clock_out).toLocaleString() : 'N/A'}</span>}</TableCell>
-                    <TableCell className="text-slate-400">{calculateDuration(log.clock_in, log.clock_out)}</TableCell>
-                    <TableCell>{editingLog?.id === log.id ? <Input type="text" value={editingLog.notes || ''} onChange={e => setEditingLog({...editingLog, notes: e.target.value})} className="bg-slate-800 border-slate-600" /> : <span className="text-slate-300">{log.notes || '-'}</span>}</TableCell>
+                  <TableRow key={log.id}>
+                    <TableCell>{log.jobs ? `${log.jobs.job_type} (${log.jobs.truck_vin?.slice(-6) || 'N/A'})` : 'General Shift'}</TableCell>
+                    <TableCell>{editingLog?.id === log.id ? <Input type="datetime-local" defaultValue={log.clock_in ? new Date(new Date(log.clock_in).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 16) : ''} onChange={e => setEditingLog({...editingLog, clock_in: e.target.value})} /> : <span>{new Date(log.clock_in).toLocaleString()}</span>}</TableCell>
+                    <TableCell>{editingLog?.id === log.id ? <Input type="datetime-local" defaultValue={log.clock_out ? new Date(new Date(log.clock_out).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 16) : ''} onChange={e => setEditingLog({...editingLog, clock_out: e.target.value})} /> : <span>{log.clock_out ? new Date(log.clock_out).toLocaleString() : 'N/A'}</span>}</TableCell>
+                    <TableCell>{calculateDuration(log.clock_in, log.clock_out)}</TableCell>
+                    <TableCell>{editingLog?.id === log.id ? <Input type="text" defaultValue={log.notes || ''} onChange={e => setEditingLog({...editingLog, notes: e.target.value})} /> : <span>{log.notes || '-'}</span>}</TableCell>
                     <TableCell className="text-right">
                       {editingLog?.id === log.id ? (
                         <div className="flex gap-2 justify-end">

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TechnicianForm, Technician } from "./TechnicianForm";
+import { TechnicianTimeLogModal } from "./TechnicianTimeLogModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
@@ -19,7 +20,9 @@ export const TechnicianManagement = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null);
+  const [viewingLogsFor, setViewingLogsFor] = useState<Technician | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
 
   const { data: technicians = [], isLoading } = useQuery({
     queryKey: ['technicians'],
@@ -41,12 +44,13 @@ export const TechnicianManagement = () => {
 
   const saveMutation = useMutation({
     mutationFn: async (tech: Technician) => {
-      if (tech.id) {
-        const { error } = await supabase.from('techs').update({ ...tech, updated_at: new Date().toISOString() }).eq('id', tech.id);
+      const { id, ...updateData } = tech;
+      if (id) {
+        const { error } = await supabase.from('techs').update(updateData).eq('id', id);
         if (error) throw error;
         return tech;
       } else {
-        const { data, error } = await supabase.from('techs').insert({ ...tech, id: crypto.randomUUID() }).select().single();
+        const { data, error } = await supabase.from('techs').insert(updateData).select().single();
         if (error) throw error;
         return data;
       }
@@ -69,7 +73,7 @@ export const TechnicianManagement = () => {
       const { error } = await supabase.from('techs').delete().eq('id', techId);
       if (error) throw error;
     },
-    onSuccess: (_, techId) => {
+    onSuccess: () => {
       toast({ title: "Technician Deleted", description: `Technician has been removed.` });
     },
     onError: (error: any) => {
@@ -174,6 +178,9 @@ export const TechnicianManagement = () => {
                 </div>
                 
                 <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setViewingLogsFor(tech); setIsLogModalOpen(true); }}>
+                    <Clock className="h-3 w-3 mr-1" /> Time Log
+                  </Button>
                   <Dialog open={selectedTech?.id === tech.id} onOpenChange={(isOpen) => !isOpen && setSelectedTech(null)}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm" onClick={() => setSelectedTech(tech)}>
@@ -200,6 +207,14 @@ export const TechnicianManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      {viewingLogsFor && (
+        <TechnicianTimeLogModal
+          isOpen={isLogModalOpen}
+          onClose={() => setIsLogModalOpen(false)}
+          technician={viewingLogsFor}
+        />
+      )}
     </div>
   );
 };
