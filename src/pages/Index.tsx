@@ -16,10 +16,10 @@ import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { useToast } from "@/components/ui/use-toast";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { FloatingAIHelper } from "@/components/FloatingAIHelper";
-import { InvoicingSystem } from "@/components/InvoicingSystem"; // Added InvoicingSystem import
+import { InvoicingSystem } from "@/components/InvoicingSystem";
 import React from "react";
 
-const DashboardPage = React.lazy(() => import('./DashboardPage')); // Changed to default import
+const DashboardPage = React.lazy(() => import('./DashboardPage'));
 const ReportsAnalytics = React.lazy(() => import('@/components/ReportsAnalytics').then(module => ({ default: module.ReportsAnalytics })));
 const ShopSettings = React.lazy(() => import('@/components/ShopSettings').then(module => ({ default: module.ShopSettings })));
 const TechnicianDashboard = React.lazy(() => import('@/components/TechnicianDashboard').then(module => ({ default: module.TechnicianDashboard })));
@@ -86,7 +86,7 @@ const Sidebar = ({ userRole, onLinkClick }: SidebarProps) => {
 };
 
 const Index = () => {
-  const { userRole } = useSession();
+  const { userRole } = useSession(); // Keep this to get the userRole for rendering content
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -133,9 +133,9 @@ const Index = () => {
     setIsInvoiceEditorOpen(true);
   };
 
-  if (!userRole) {
-    return <div className="flex items-center justify-center h-screen bg-background"><LoadingSkeleton /></div>;
-  }
+  // Removed the `if (!userRole)` check here.
+  // The top-level AppRoutes component handles the initial loading state.
+  // By the time Index renders, userRole will eventually be set by SessionProvider.
 
   const getPageTitle = () => {
     const currentPath = location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`;
@@ -146,7 +146,9 @@ const Index = () => {
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
-        <Sidebar userRole={userRole} />
+        {/* Pass a default 'unassigned' role if userRole is null during initial render,
+            though SessionProvider should ensure it's set quickly. */}
+        <Sidebar userRole={userRole || 'unassigned'} /> 
       </div>
       <div className="flex flex-col">
         <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
@@ -158,7 +160,7 @@ const Index = () => {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col p-0">
-              <Sidebar userRole={userRole} onLinkClick={() => setIsSidebarOpen(false)} />
+              <Sidebar userRole={userRole || 'unassigned'} onLinkClick={() => setIsSidebarOpen(false)} />
             </SheetContent>
           </Sheet>
           <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
@@ -178,7 +180,7 @@ const Index = () => {
                   />
                 ) : (
                   <TechnicianDashboard 
-                    userRole={userRole}
+                    userRole={userRole || 'unassigned'} // Ensure userRole is always passed
                     onJobClick={handleJobClick}
                   />
                 )
@@ -194,7 +196,7 @@ const Index = () => {
         <JobDetailsModal
           job={selectedJob}
           onClose={() => setSelectedJob(null)}
-          userRole={userRole}
+          userRole={userRole || 'unassigned'} // Ensure userRole is always passed
           onGenerateInvoice={handleGenerateInvoice}
         />
       )}
