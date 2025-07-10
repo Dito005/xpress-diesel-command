@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Bot, FileText as InvoiceIcon } from "lucide-react";
+import { Settings, Bot, FileText as InvoiceIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +18,7 @@ const fetchSettings = async (): Promise<Record<string, any>> => {
   if (generalError) throw new Error(generalError.message);
   
   const { data: invoiceSettings, error: invoiceError } = await supabase.from('invoice_settings').select('*').single();
-  if (invoiceError) throw new Error(invoiceError.message);
+  if (invoiceError && invoiceError.code !== 'PGRST116') throw new Error(invoiceError.message);
 
   const settingsMap = generalSettings.reduce((acc: Record<string, string>, setting) => {
     acc[setting.key] = setting.value;
@@ -92,7 +92,7 @@ export const ShopSettings = () => {
 
   const updateInvoiceSettingsMutation = useMutation({
     mutationFn: async (newSettings: typeof invoiceSettings) => {
-      const { error } = await supabase.from('invoice_settings').update(newSettings).eq('id', '00000000-0000-0000-0000-000000000001');
+      const { error } = await supabase.from('invoice_settings').upsert({ ...newSettings, id: '00000000-0000-0000-0000-000000000001' }, { onConflict: 'id' });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -143,46 +143,18 @@ export const ShopSettings = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <Label>Default Parts Markup (%)</Label>
-                  <Input type="number" value={invoiceSettings.default_markup_parts} onChange={e => setInvoiceSettings(p => ({...p, default_markup_parts: parseFloat(e.target.value)}))} />
+              {isLoadingSettings ? <Loader2 className="animate-spin" /> : <>
+                <div className="grid grid-cols-2 gap-6">
+                  <div><Label>Default Parts Markup (%)</Label><Input type="number" value={invoiceSettings.default_markup_parts} onChange={e => setInvoiceSettings(p => ({...p, default_markup_parts: parseFloat(e.target.value)}))} /></div>
+                  <div><Label>Default Hourly Rate ($)</Label><Input type="number" value={invoiceSettings.default_hourly_rate} onChange={e => setInvoiceSettings(p => ({...p, default_hourly_rate: parseFloat(e.target.value)}))} /></div>
+                  <div><Label>Shop Supply Fee (%)</Label><Input type="number" value={invoiceSettings.shop_supply_fee_percentage} onChange={e => setInvoiceSettings(p => ({...p, shop_supply_fee_percentage: parseFloat(e.target.value)}))} /></div>
+                  <div><Label>Disposal Fee (flat $)</Label><Input type="number" value={invoiceSettings.disposal_fee} onChange={e => setInvoiceSettings(p => ({...p, disposal_fee: parseFloat(e.target.value)}))} /></div>
+                  <div><Label>Credit Card Fee (%)</Label><Input type="number" value={invoiceSettings.credit_card_fee_percentage} onChange={e => setInvoiceSettings(p => ({...p, credit_card_fee_percentage: parseFloat(e.target.value)}))} /></div>
+                  <div><Label>Tax Rate (%)</Label><Input type="number" value={invoiceSettings.tax_rate} onChange={e => setInvoiceSettings(p => ({...p, tax_rate: parseFloat(e.target.value)}))} /></div>
+                  <div className="col-span-2"><Label>Tax Applies To</Label><Select value={invoiceSettings.tax_applies_to} onValueChange={v => setInvoiceSettings(p => ({...p, tax_applies_to: v}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="parts">Parts Only</SelectItem><SelectItem value="labor">Labor Only</SelectItem><SelectItem value="both">Parts & Labor</SelectItem></SelectContent></Select></div>
                 </div>
-                <div>
-                  <Label>Default Hourly Rate ($)</Label>
-                  <Input type="number" value={invoiceSettings.default_hourly_rate} onChange={e => setInvoiceSettings(p => ({...p, default_hourly_rate: parseFloat(e.target.value)}))} />
-                </div>
-                <div>
-                  <Label>Shop Supply Fee (%)</Label>
-                  <Input type="number" value={invoiceSettings.shop_supply_fee_percentage} onChange={e => setInvoiceSettings(p => ({...p, shop_supply_fee_percentage: parseFloat(e.target.value)}))} />
-                </div>
-                <div>
-                  <Label>Disposal Fee (flat $)</Label>
-                  <Input type="number" value={invoiceSettings.disposal_fee} onChange={e => setInvoiceSettings(p => ({...p, disposal_fee: parseFloat(e.target.value)}))} />
-                </div>
-                <div>
-                  <Label>Credit Card Fee (%)</Label>
-                  <Input type="number" value={invoiceSettings.credit_card_fee_percentage} onChange={e => setInvoiceSettings(p => ({...p, credit_card_fee_percentage: parseFloat(e.target.value)}))} />
-                </div>
-                <div>
-                  <Label>Tax Rate (%)</Label>
-                  <Input type="number" value={invoiceSettings.tax_rate} onChange={e => setInvoiceSettings(p => ({...p, tax_rate: parseFloat(e.target.value)}))} />
-                </div>
-                <div className="col-span-2">
-                  <Label>Tax Applies To</Label>
-                  <Select value={invoiceSettings.tax_applies_to} onValueChange={v => setInvoiceSettings(p => ({...p, tax_applies_to: v}))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="parts">Parts Only</SelectItem>
-                      <SelectItem value="labor">Labor Only</SelectItem>
-                      <SelectItem value="both">Parts & Labor</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button onClick={handleInvoiceSettingsSave} disabled={updateInvoiceSettingsMutation.isPending}>
-                {updateInvoiceSettingsMutation.isPending ? "Saving..." : "Save Invoice Settings"}
-              </Button>
+                <Button onClick={handleInvoiceSettingsSave} disabled={updateInvoiceSettingsMutation.isPending}>{updateInvoiceSettingsMutation.isPending ? "Saving..." : "Save Invoice Settings"}</Button>
+              </>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -194,69 +166,21 @@ export const ShopSettings = () => {
         <TabsContent value="ai" className="space-y-4">
           <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="h-5 w-5" />
-                AI Assistant Settings
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" />AI Assistant Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isLoadingSettings ? <p>Loading AI settings...</p> : (
-                <>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Enable AI Assistant</Label>
-                      <p className="text-sm text-gray-600">Toggle the AI chatbot for all users.</p>
-                    </div>
-                    <Switch
-                      checked={aiSettings.ai_enabled}
-                      onCheckedChange={(checked) => setAiSettings(prev => ({ ...prev, ai_enabled: checked }))}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="aiProvider">AI Provider</Label>
-                      <Select
-                        value={aiSettings.ai_provider}
-                        onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_provider: value }))}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="openai">OpenAI</SelectItem>
-                          <SelectItem value="gemini">Google Gemini</SelectItem>
-                          <SelectItem value="copilot">Microsoft Copilot</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="aiModel">AI Model</Label>
-                      <Select
-                        value={aiSettings.ai_model}
-                        onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_model: value }))}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                          <SelectItem value="gpt-4">GPT-4</SelectItem>
-                          <SelectItem value="gpt-3.5-turbo">GPT-3.5-Turbo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="apiKey">API Key</Label>
-                    <Input
-                      id="apiKey"
-                      type="password"
-                      placeholder="Enter your API key"
-                      value={aiSettings.ai_api_key}
-                      onChange={(e) => setAiSettings(prev => ({ ...prev, ai_api_key: e.target.value }))}
-                    />
-                  </div>
-                  <Button onClick={handleAiSettingsSave} disabled={updateGeneralSettingsMutation.isPending}>
-                    {updateGeneralSettingsMutation.isPending ? "Saving..." : "Save AI Settings"}
-                  </Button>
-                </>
-              )}
+              {isLoadingSettings ? <Loader2 className="animate-spin" /> : <>
+                <div className="flex items-center justify-between">
+                  <div><Label>Enable AI Assistant</Label><p className="text-sm text-gray-600">Toggle the AI chatbot for all users.</p></div>
+                  <Switch checked={aiSettings.ai_enabled} onCheckedChange={(checked) => setAiSettings(prev => ({ ...prev, ai_enabled: checked }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label htmlFor="aiProvider">AI Provider</Label><Select value={aiSettings.ai_provider} onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_provider: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="openai">OpenAI</SelectItem><SelectItem value="gemini">Google Gemini</SelectItem><SelectItem value="copilot">Microsoft Copilot</SelectItem></SelectContent></Select></div>
+                  <div><Label htmlFor="aiModel">AI Model</Label><Select value={aiSettings.ai_model} onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_model: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="gpt-4o">GPT-4o</SelectItem><SelectItem value="gpt-4">GPT-4</SelectItem><SelectItem value="gpt-3.5-turbo">GPT-3.5-Turbo</SelectItem></SelectContent></Select></div>
+                </div>
+                <div><Label htmlFor="apiKey">API Key</Label><Input id="apiKey" type="password" placeholder="Enter your API key" value={aiSettings.ai_api_key} onChange={(e) => setAiSettings(prev => ({ ...prev, ai_api_key: e.target.value }))} /></div>
+                <Button onClick={handleAiSettingsSave} disabled={updateGeneralSettingsMutation.isPending}>{updateGeneralSettingsMutation.isPending ? "Saving..." : "Save AI Settings"}</Button>
+              </>}
             </CardContent>
           </Card>
         </TabsContent>
