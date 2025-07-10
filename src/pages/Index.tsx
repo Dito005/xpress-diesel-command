@@ -1,4 +1,4 @@
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { NavLink, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -86,10 +86,36 @@ const Sidebar = ({ userRole, onLinkClick }: SidebarProps) => {
 const Index = () => {
   const { userRole } = useSession();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
+
+  useEffect(() => {
+    const handlePaymentSuccess = async (invoiceId: string) => {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ status: 'paid' })
+        .eq('id', invoiceId);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Payment Update Failed", description: error.message });
+      } else {
+        toast({ title: "Payment Successful!", description: `Invoice #${invoiceId.slice(0, 8)} has been marked as paid.` });
+      }
+      navigate(location.pathname, { replace: true });
+    };
+
+    const params = new URLSearchParams(location.search);
+    const paymentStatus = params.get('payment_status');
+    const invoiceId = params.get('invoice_id');
+
+    if (paymentStatus === 'success' && invoiceId) {
+      handlePaymentSuccess(invoiceId);
+    }
+  }, [location, navigate, toast]);
 
   const handleJobClick = (job) => {
     setSelectedJob(job);

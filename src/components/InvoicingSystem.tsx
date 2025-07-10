@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Plus, DollarSign, Trash2, Loader2, Search, Edit, Printer, Mail, CheckCircle } from "lucide-react";
@@ -26,14 +26,12 @@ const invoiceSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
   status: z.string().default('pending'),
   invoiceDate: z.string().min(1, "Invoice date is required"),
-  customerConcern: z.string().optional(),
-  recommendedService: z.string().optional(),
   actualService: z.string().min(1, "Actual work performed is required"),
   paymentMethod: z.string().optional(),
   laborEntries: z.array(z.object({
-    techId: z.string().min(1, "Technician is required"),
-    hoursWorked: z.preprocess(val => parseFloat(String(val) || '0'), z.number().min(0.1)),
-    hourlyRate: z.preprocess(val => parseFloat(String(val) || '0'), z.number().min(0)),
+    description: z.string().min(1, "Description is required"),
+    hours: z.preprocess(val => parseFloat(String(val) || '0'), z.number().min(0.1)),
+    rate: z.preprocess(val => parseFloat(String(val) || '0'), z.number().min(0)),
   })).min(1, "At least one labor entry is required"),
   partEntries: z.array(z.object({
     partId: z.string().min(1, "Part is required"),
@@ -51,7 +49,7 @@ const invoiceSchema = z.object({
 
 const fetchInvoicingData = async () => {
   const [invPromise, jobPromise, partPromise, techPromise, settingsPromise] = [
-    supabase.from('invoices').select('*, jobs(*), invoice_parts(*, parts(*)), invoice_labor(*, techs(*)), payments(*)').order('created_at', { ascending: false }),
+    supabase.from('invoices').select('*, jobs(*), invoice_parts(*, parts(*)), invoice_labor(*), payments(*)').order('created_at', { ascending: false }),
     supabase.from('jobs').select('*'),
     supabase.from('parts').select('*'),
     supabase.from('techs').select('*'),
@@ -84,11 +82,12 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [totals, setTotals] = useState({ subtotal: 0, tax: 0, grandTotal: 0, ccFee: 0 });
-  const [clockedHours, setClockedHours] = useState(0);
+  const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState({ method: 'cash', amount: 0, transaction_id: '' });
   const printRef = useRef(null);
 
   const { data, isLoading } = useQuery({ queryKey: ['invoicingData'], queryFn: fetchInvoicingData });
-  const { invoices = [], jobs = [], parts = [], techs = [], invoiceSettings = null } = data || {};
+  const { invoices = [], jobs = [], parts = [], invoiceSettings = null } = data || {};
 
   const form = useForm<z.infer<typeof invoiceSchema>>({
     resolver: zodResolver(invoiceSchema),
@@ -103,7 +102,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
 
   useEffect(() => {
     if (!invoiceSettings) return;
-    const laborTotal = watchedValues.laborEntries?.reduce((sum, l) => sum + (l.hoursWorked || 0) * (l.hourlyRate || 0), 0) || 0;
+    const laborTotal = watchedValues.laborEntries?.reduce((sum, l) => sum + (l.hours || 0) * (l.rate || 0), 0) || 0;
     const partsTotal = watchedValues.partEntries?.reduce((sum, p) => sum + (p.finalPrice || 0), 0) || 0;
     const subtotal = laborTotal + partsTotal;
     let taxableBase = 0;
@@ -134,14 +133,13 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
         jobId: editingInvoice.job_id,
         status: editingInvoice.status,
         invoiceDate: new Date(editingInvoice.created_at).toISOString().substring(0, 10),
-        customerConcern: editingInvoice.customer_concern,
-        recommendedService: editingInvoice.recommended_service,
         actualService: editingInvoice.actual_service,
         paymentMethod: editingInvoice.payment_method,
-        laborEntries: editingInvoice.invoice_labor.map((l: any) => ({ techId: l.tech_id, hoursWorked: l.hours_worked, hourlyRate: l.hourly_rate })),
+        laborEntries: editingInvoice.invoice_labor.map((l: any) => ({ description: l.description, hours: l.hours, rate: l.rate })),
         partEntries: editingInvoice.invoice_parts.map((p: any) => ({ partId: p.part_id, quantity: p.quantity, unitPrice: p.unit_price, markupPercentage: p.markup_percentage, finalPrice: p.final_price })),
         miscFees: editingInvoice.misc_fees || [],
       });
+      setPaymentDetails(prev => ({ ...prev, amount: editingInvoice.grand_total }));
     } else if (!isOpen) {
       form.reset({ status: 'pending', invoiceDate: new Date().toISOString().substring(0, 10), laborEntries: [], partEntries: [], miscFees: [], grandTotal: 0 });
     }
@@ -149,7 +147,8 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
 
   const upsertInvoiceMutation = useMutation({
     mutationFn: async (values: z.infer<typeof invoiceSchema>) => {
-      const invoicePayload = { job_id: values.jobId, status: values.status, created_at: values.invoiceDate, customer_concern: values.customerConcern, recommended_service: values.recommendedService, actual_service: values.actualService, payment_method: values.paymentMethod, subtotal: totals.subtotal, tax: totals.tax, grand_total: totals.grandTotal, misc_fees: values.miscFees, created_by: session?.user.id };
+      const { jobId, ...rest } = values;
+      const invoicePayload = { ...rest, job_id: jobId, subtotal: totals.subtotal, tax: totals.tax, grand_total: totals.grandTotal, misc_fees: values.miscFees, created_by: session?.user.id };
       const { data: savedInvoice, error } = values.id ? await supabase.from('invoices').update(invoicePayload).eq('id', values.id).select().single() : await supabase.from('invoices').insert(invoicePayload).select().single();
       if (error) throw error;
       await supabase.from('invoice_labor').delete().eq('invoice_id', savedInvoice.id);
@@ -169,7 +168,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {
       const invoiceHtml = renderToString(<InvoiceTemplate ref={printRef} invoice={editingInvoice} totals={totals} settings={invoiceSettings} companyInfo={{}} />);
-      const { error } = await supabase.functions.invoke('send-invoice-email', { body: { toEmail: editingInvoice.jobs.customer_email, invoiceHtml, invoiceId: editingInvoice.id.slice(0, 8) } });
+      const { error } = await supabase.functions.invoke('send-invoice-email', { body: { toEmail: editingInvoice.jobs.customer_email, invoiceHtml, invoiceId: editingInvoice.id, grandTotal: editingInvoice.grand_total, customerEmail: editingInvoice.jobs.customer_email, appUrl: window.location.origin } });
       if (error) throw error;
       await supabase.from('invoices').update({ status: 'sent' }).eq('id', editingInvoice.id);
     },
@@ -181,16 +180,21 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
     onError: (error: any) => toast({ variant: "destructive", title: "Email Failed", description: error.message }),
   });
 
-  const handleJobSelect = async (jobId: string) => {
-    const selectedJob = jobs.find(j => j.id === jobId);
-    if (selectedJob) {
-      form.setValue("customerConcern", selectedJob.customer_concern);
-      form.setValue("recommendedService", selectedJob.recommended_service);
-      const { data: logs } = await supabase.from('time_logs').select('*').eq('job_id', jobId);
-      const totalMs = logs?.reduce((sum, log) => sum + (new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime()), 0) || 0;
-      setClockedHours(totalMs / 3600000);
-    }
-  };
+  const markAsPaidMutation = useMutation({
+    mutationFn: async () => {
+      const { error: paymentError } = await supabase.from('payments').insert({ ...paymentDetails, invoice_id: editingInvoice.id });
+      if (paymentError) throw paymentError;
+      const { error: invoiceError } = await supabase.from('invoices').update({ status: 'paid' }).eq('id', editingInvoice.id);
+      if (invoiceError) throw invoiceError;
+    },
+    onSuccess: () => {
+      toast({ title: "Payment Recorded", description: "Invoice marked as paid." });
+      queryClient.invalidateQueries({ queryKey: ['invoicingData'] });
+      setIsMarkPaidOpen(false);
+      onSuccess();
+    },
+    onError: (error: any) => toast({ variant: "destructive", title: "Error", description: error.message }),
+  });
 
   const handlePrint = async () => {
     const element = printRef.current;
@@ -261,56 +265,59 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
           <div className="overflow-y-auto pr-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit((v) => upsertInvoiceMutation.mutate(v))} className="space-y-6 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField control={form.control} name="jobId" render={({ field }) => (<FormItem><FormLabel>Job</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleJobSelect(value); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a job" /></SelectTrigger></FormControl><SelectContent>{jobs.map(job => <SelectItem key={job.id} value={job.id}>{job.truck_vin?.slice(-6)} - {job.job_type}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <Card className="bg-card/80"><CardHeader><CardTitle>1. Job & Date</CardTitle></CardHeader><CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                  <FormField control={form.control} name="jobId" render={({ field }) => (<FormItem><FormLabel>Job</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a job" /></SelectTrigger></FormControl><SelectContent>{jobs.map(job => <SelectItem key={job.id} value={job.id}>{job.truck_vin?.slice(-6)} - {job.job_type}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="invoiceDate" render={({ field }) => (<FormItem><FormLabel>Invoice Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="pending">Pending</SelectItem><SelectItem value="sent">Sent</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                </div>
-                <FormField control={form.control} name="actualService" render={({ field }) => (<FormItem><FormLabel>Work Performed</FormLabel><FormControl><Textarea placeholder="Describe work performed..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+                </CardContent></Card>
                 
-                <Card className="bg-card/80"><CardHeader><CardTitle>Labor</CardTitle></CardHeader><CardContent className="space-y-2">
-                  {clockedHours > 0 && <p className="text-sm text-muted-foreground">Total clocked hours for this job: {clockedHours.toFixed(2)}h</p>}
-                  {laborFields.map((field, index) => (
-                    <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-4"><FormField control={form.control} name={`laborEntries.${index}.techId`} render={({ field }) => (<Select onValueChange={(val) => { field.onChange(val); const tech = techs.find(t => t.id === val); if (tech) form.setValue(`laborEntries.${index}.hourlyRate`, tech.hourly_rate || invoiceSettings.default_hourly_rate); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Tech" /></SelectTrigger></FormControl><SelectContent>{techs.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>)} /></div>
-                      <div className="col-span-3"><FormField control={form.control} name={`laborEntries.${index}.hoursWorked`} render={({ field }) => (<Input type="number" placeholder="Hours" {...field} />)} /></div>
-                      <div className="col-span-3"><FormField control={form.control} name={`laborEntries.${index}.hourlyRate`} render={({ field }) => (<Input type="number" placeholder="Rate" {...field} />)} /></div>
-                      <div className="col-span-2"><Button type="button" variant="destructive" size="sm" onClick={() => removeLabor(index)}><Trash2 className="h-4 w-4" /></Button></div>
-                    </div>
-                  ))}
-                  <Button type="button" variant="outline" size="sm" onClick={() => appendLabor({ techId: '', hoursWorked: 1, hourlyRate: invoiceSettings?.default_hourly_rate || 0 })}>Add Labor</Button>
+                <Card className="bg-card/80"><CardHeader><CardTitle>2. Work Performed</CardTitle></CardHeader><CardContent className="pt-4">
+                  <FormField control={form.control} name="actualService" render={({ field }) => (<FormItem><FormLabel>Describe work performed for customer</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
                 </CardContent></Card>
 
-                <Card className="bg-card/80"><CardHeader><CardTitle>Parts</CardTitle></CardHeader><CardContent className="space-y-2">
+                <Card className="bg-card/80"><CardHeader><CardTitle>3. Labor Charges</CardTitle></CardHeader><CardContent className="space-y-2 pt-4">
+                  {laborFields.map((field, index) => (
+                    <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-5"><FormField control={form.control} name={`laborEntries.${index}.description`} render={({ field }) => (<Input placeholder="Labor description" {...field} />)} /></div>
+                      <div className="col-span-3"><FormField control={form.control} name={`laborEntries.${index}.hours`} render={({ field }) => (<Input type="number" placeholder="Hours" {...field} />)} /></div>
+                      <div className="col-span-3"><FormField control={form.control} name={`laborEntries.${index}.rate`} render={({ field }) => (<Input type="number" placeholder="Rate" {...field} />)} /></div>
+                      <div className="col-span-1"><Button type="button" variant="destructive" size="icon" onClick={() => removeLabor(index)}><Trash2 className="h-4 w-4" /></Button></div>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => appendLabor({ description: 'Shop Labor', hours: 1, rate: invoiceSettings?.shop_labor_rate || 150 })}>Add Shop Labor</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => appendLabor({ description: 'Road Service', hours: 1, rate: invoiceSettings?.road_labor_rate || 175 })}>Add Road Labor</Button>
+                  </div>
+                </CardContent></Card>
+
+                <Card className="bg-card/80"><CardHeader><CardTitle>4. Parts & Materials</CardTitle></CardHeader><CardContent className="space-y-2 pt-4">
                   {partFields.map((field, index) => (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-3"><FormField control={form.control} name={`partEntries.${index}.partId`} render={({ field }) => (<Select onValueChange={(val) => { field.onChange(val); const part = parts.find(p => p.id === val); if (part) { form.setValue(`partEntries.${index}.unitPrice`, part.cost); const qty = form.getValues(`partEntries.${index}.quantity`); const markup = form.getValues(`partEntries.${index}.markupPercentage`); form.setValue(`partEntries.${index}.finalPrice`, qty * part.cost * (1 + markup / 100)); } }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Part" /></SelectTrigger></FormControl><SelectContent>{parts.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>)} /></div>
+                      <div className="col-span-4"><FormField control={form.control} name={`partEntries.${index}.partId`} render={({ field }) => (<Select onValueChange={(val) => { field.onChange(val); const part = parts.find(p => p.id === val); if (part) { form.setValue(`partEntries.${index}.unitPrice`, part.cost); const qty = form.getValues(`partEntries.${index}.quantity`); const markup = form.getValues(`partEntries.${index}.markupPercentage`); form.setValue(`partEntries.${index}.finalPrice`, qty * part.cost * (1 + markup / 100)); } }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Part" /></SelectTrigger></FormControl><SelectContent>{parts.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.part_number})</SelectItem>)}</SelectContent></Select>)} /></div>
                       <div className="col-span-2"><FormField control={form.control} name={`partEntries.${index}.quantity`} render={({ field }) => (<Input type="number" placeholder="Qty" {...field} onChange={(e) => { field.onChange(e); const partId = form.getValues(`partEntries.${index}.partId`); const part = parts.find(p => p.id === partId); if (part) { const markup = form.getValues(`partEntries.${index}.markupPercentage`); form.setValue(`partEntries.${index}.finalPrice`, Number(e.target.value) * part.cost * (1 + markup / 100)); } }} />)} /></div>
-                      <div className="col-span-2"><FormField control={form.control} name={`partEntries.${index}.unitPrice`} render={({ field }) => (<Input type="number" placeholder="Unit Price" {...field} readOnly />)} /></div>
                       <div className="col-span-2"><FormField control={form.control} name={`partEntries.${index}.markupPercentage`} render={({ field }) => (<Input type="number" placeholder="Markup %" {...field} onChange={(e) => { field.onChange(e); const partId = form.getValues(`partEntries.${index}.partId`); const part = parts.find(p => p.id === partId); if (part) { const qty = form.getValues(`partEntries.${index}.quantity`); form.setValue(`partEntries.${index}.finalPrice`, qty * part.cost * (1 + Number(e.target.value) / 100)); } }} />)} /></div>
-                      <div className="col-span-2"><FormField control={form.control} name={`partEntries.${index}.finalPrice`} render={({ field }) => (<Input type="number" placeholder="Final Price" {...field} readOnly />)} /></div>
-                      <div className="col-span-1"><Button type="button" variant="destructive" size="sm" onClick={() => removePart(index)}><Trash2 className="h-4 w-4" /></Button></div>
+                      <div className="col-span-3"><FormField control={form.control} name={`partEntries.${index}.finalPrice`} render={({ field }) => (<div className="relative"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">$</span><Input type="number" className="pl-6" placeholder="Final Price" {...field} readOnly /></div>)} /></div>
+                      <div className="col-span-1"><Button type="button" variant="destructive" size="icon" onClick={() => removePart(index)}><Trash2 className="h-4 w-4" /></Button></div>
                     </div>
                   ))}
                   <Button type="button" variant="outline" size="sm" onClick={() => appendPart({ partId: '', quantity: 1, unitPrice: 0, markupPercentage: invoiceSettings?.default_markup_parts || 0, finalPrice: 0 })}>Add Part</Button>
                 </CardContent></Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="bg-card/80"><CardHeader><CardTitle>Fees & Payment</CardTitle></CardHeader><CardContent className="space-y-2">
+                  <Card className="bg-card/80"><CardHeader><CardTitle>5. Fees & Payment</CardTitle></CardHeader><CardContent className="space-y-2 pt-4">
                     {miscFeeFields.map((field, index) => (
                       <div key={field.id} className="flex gap-2 items-center">
                         <FormField control={form.control} name={`miscFees.${index}.description`} render={({ field }) => (<Input placeholder="Fee description" {...field} />)} />
                         <FormField control={form.control} name={`miscFees.${index}.amount`} render={({ field }) => (<Input type="number" placeholder="Amount" {...field} />)} />
-                        <Button type="button" variant="destructive" size="sm" onClick={() => removeMiscFee(index)}><Trash2 className="h-4 w-4" /></Button>
+                        <Button type="button" variant="destructive" size="icon" onClick={() => removeMiscFee(index)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     ))}
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" size="sm" onClick={() => appendMiscFee({ description: 'Shop Supplies', amount: totals.subtotal * ((invoiceSettings?.shop_supply_fee_percentage || 0) / 100) })}>Add Shop Fee</Button>
                       <Button type="button" variant="outline" size="sm" onClick={() => appendMiscFee({ description: 'Disposal Fee', amount: invoiceSettings?.disposal_fee || 0 })}>Add Disposal Fee</Button>
                     </div>
-                    <FormField control={form.control} name="paymentMethod" render={({ field }) => (<FormItem className="pt-4"><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="check">Check</SelectItem><SelectItem value="cc_physical">Credit Card (Physical)</SelectItem><SelectItem value="stripe">Credit Card (Online)</SelectItem></SelectContent></Select></FormItem>)} />
                   </CardContent></Card>
-                  <Card className="bg-card/80"><CardHeader><CardTitle>Summary</CardTitle></CardHeader><CardContent className="space-y-1 text-sm">
+                  <Card className="bg-card/80"><CardHeader><CardTitle>6. Summary</CardTitle></CardHeader><CardContent className="space-y-1 text-sm pt-4">
                     <div className="flex justify-between"><span>Subtotal:</span><span>${totals.subtotal.toFixed(2)}</span></div>
                     <div className="flex justify-between"><span>Tax ({invoiceSettings?.tax_rate}%):</span><span>${totals.tax.toFixed(2)}</span></div>
                     {watchedValues.miscFees?.map((fee, i) => <div key={i} className="flex justify-between"><span>{fee.description}:</span><span>${fee.amount.toFixed(2)}</span></div>)}
@@ -322,8 +329,8 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
                 <div className="flex justify-between items-center pt-4 border-t">
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" onClick={handlePrint} disabled={!editingInvoice}><Printer className="h-4 w-4 mr-2" /> Print</Button>
-                    <Button type="button" variant="outline" onClick={() => sendEmailMutation.mutate()} disabled={!editingInvoice || sendEmailMutation.isPending}>{sendEmailMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />} Email</Button>
-                    <Button type="button" variant="outline" onClick={() => form.setValue('status', 'paid')} disabled={!editingInvoice}><CheckCircle className="h-4 w-4 mr-2" /> Mark Paid</Button>
+                    <Button type="button" variant="outline" onClick={() => sendEmailMutation.mutate()} disabled={!editingInvoice || sendEmailMutation.isPending}>{sendEmailMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />} Send & Request Payment</Button>
+                    <Button type="button" variant="outline" onClick={() => setIsMarkPaidOpen(true)} disabled={!editingInvoice}><CheckCircle className="h-4 w-4 mr-2" /> Mark Paid</Button>
                   </div>
                   <Button type="submit" disabled={upsertInvoiceMutation.isPending}>
                     {upsertInvoiceMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Invoice"}
@@ -335,6 +342,21 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
           <div style={{ position: 'fixed', left: '-9999px', top: '-9999px' }}>
             <InvoiceTemplate ref={printRef} invoice={editingInvoice} totals={totals} settings={invoiceSettings} companyInfo={{}} />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMarkPaidOpen} onOpenChange={setIsMarkPaidOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Mark Invoice as Paid</DialogTitle><DialogDescription>Record a manual payment for this invoice.</DialogDescription></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div><Label>Payment Method</Label><Select value={paymentDetails.method} onValueChange={(v) => setPaymentDetails(p => ({...p, method: v}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="check">Check</SelectItem><SelectItem value="efs_check">EFS Check</SelectItem><SelectItem value="cc_physical">Credit Card (Physical)</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
+            <div><Label>Amount Paid</Label><Input type="number" value={paymentDetails.amount} onChange={(e) => setPaymentDetails(p => ({...p, amount: parseFloat(e.target.value)}))} /></div>
+            <div><Label>Reference / Check #</Label><Input value={paymentDetails.transaction_id} onChange={(e) => setPaymentDetails(p => ({...p, transaction_id: e.target.value}))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMarkPaidOpen(false)}>Cancel</Button>
+            <Button onClick={() => markAsPaidMutation.mutate()} disabled={markAsPaidMutation.isPending}>{markAsPaidMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Payment"}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

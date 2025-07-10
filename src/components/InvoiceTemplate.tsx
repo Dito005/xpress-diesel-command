@@ -75,15 +75,15 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
         <tbody>
           {invoice.invoice_labor?.map((l: any) => (
             <tr key={`labor-${l.id}`}>
-              <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>Labor: {l.techs?.name}</td>
-              <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>{l.hours_worked}</td>
-              <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>${l.hourly_rate.toFixed(2)}</td>
-              <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>${(l.hours_worked * l.hourly_rate).toFixed(2)}</td>
+              <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>Labor: {l.description}</td>
+              <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>{l.hours}</td>
+              <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>${l.rate.toFixed(2)}</td>
+              <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>${(l.hours * l.rate).toFixed(2)}</td>
             </tr>
           ))}
           {invoice.invoice_parts?.map((p: any) => (
             <tr key={`part-${p.id}`}>
-              <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>Part: {p.parts?.name}</td>
+              <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>Part: {p.parts?.name} ({p.parts?.part_number})</td>
               <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>{p.quantity}</td>
               <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>${(p.final_price / p.quantity).toFixed(2)}</td>
               <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>${p.final_price.toFixed(2)}</td>
@@ -126,6 +126,9 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
         <p>Work Performed: {invoice.actual_service}</p>
         <p>Thank you for your business!</p>
       </div>
+
+      {/* This placeholder will be replaced by the actual payment link */}
+      <!--PAYMENT_LINK_PLACEHOLDER-->
     </div>
   );
 });

@@ -60,6 +60,8 @@ export const ShopSettings = () => {
     tax_rate: 0,
     tax_applies_to: 'both',
     default_hourly_rate: 0,
+    shop_labor_rate: 150,
+    road_labor_rate: 175,
   });
 
   useEffect(() => {
@@ -78,6 +80,8 @@ export const ShopSettings = () => {
         tax_rate: settings.tax_rate || 0,
         tax_applies_to: settings.tax_applies_to || 'both',
         default_hourly_rate: settings.default_hourly_rate || 0,
+        shop_labor_rate: settings.shop_labor_rate || 150,
+        road_labor_rate: settings.road_labor_rate || 175,
       });
     }
   }, [settings]);
@@ -160,8 +164,10 @@ export const ShopSettings = () => {
             <CardContent className="space-y-4">
               {isLoadingSettings ? <Loader2 className="animate-spin" /> : <>
                 <div className="grid grid-cols-2 gap-6">
+                  <div><Label>Shop Labor Rate ($)</Label><Input type="number" value={invoiceSettings.shop_labor_rate} onChange={e => setInvoiceSettings(p => ({...p, shop_labor_rate: parseFloat(e.target.value)}))} /></div>
+                  <div><Label>Road Service Rate ($)</Label><Input type="number" value={invoiceSettings.road_labor_rate} onChange={e => setInvoiceSettings(p => ({...p, road_labor_rate: parseFloat(e.target.value)}))} /></div>
                   <div><Label>Default Parts Markup (%)</Label><Input type="number" value={invoiceSettings.default_markup_parts} onChange={e => setInvoiceSettings(p => ({...p, default_markup_parts: parseFloat(e.target.value)}))} /></div>
-                  <div><Label>Default Hourly Rate ($)</Label><Input type="number" value={invoiceSettings.default_hourly_rate} onChange={e => setInvoiceSettings(p => ({...p, default_hourly_rate: parseFloat(e.target.value)}))} /></div>
+                  <div><Label>Default Tech Rate ($)</Label><Input type="number" value={invoiceSettings.default_hourly_rate} onChange={e => setInvoiceSettings(p => ({...p, default_hourly_rate: parseFloat(e.target.value)}))} /></div>
                   <div><Label>Shop Supply Fee (%)</Label><Input type="number" value={invoiceSettings.shop_supply_fee_percentage} onChange={e => setInvoiceSettings(p => ({...p, shop_supply_fee_percentage: parseFloat(e.target.value)}))} /></div>
                   <div><Label>Disposal Fee (flat $)</Label><Input type="number" value={invoiceSettings.disposal_fee} onChange={e => setInvoiceSettings(p => ({...p, disposal_fee: parseFloat(e.target.value)}))} /></div>
                   <div><Label>Credit Card Fee (%)</Label><Input type="number" value={invoiceSettings.credit_card_fee_percentage} onChange={e => setInvoiceSettings(p => ({...p, credit_card_fee_percentage: parseFloat(e.target.value)}))} /></div>
