@@ -76,6 +76,31 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
     fetchTechs();
   }, []);
 
+  const handleUsdotLookup = async () => {
+    const usdot = form.getValues("usdotNumber");
+    if (!usdot) {
+      toast({ variant: "destructive", title: "Missing USDOT", description: "Please enter a USDOT number to look up." });
+      return;
+    }
+    setIsUsdotLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('usdot-lookup', {
+        body: { usdot },
+      });
+      if (error) throw error;
+
+      form.setValue("company", data.companyName);
+      form.setValue("customerPhone", data.companyPhone);
+      form.setValue("billingAddress", data.companyAddress);
+      toast({ title: "Company Found", description: `${data.companyName} details have been filled in.` });
+    } catch (error: any) {
+      const errorMessage = error instanceof FunctionsHttpError ? await error.context.json() : { error: error.message };
+      toast({ variant: "destructive", title: "USDOT Lookup Failed", description: errorMessage.error });
+    } finally {
+      setIsUsdotLoading(false);
+    }
+  };
+
   const handleImageScan = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -112,6 +137,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
       if (usdotMatch?.[1]) {
         form.setValue("usdotNumber", usdotMatch[1]);
         toast({ title: "USDOT Found!", description: `Populated USDOT: ${usdotMatch[1]}` });
+        handleUsdotLookup();
       }
 
       if (!vinMatch && !usdotMatch) {
@@ -196,7 +222,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
         
         <div className="space-y-4 p-4 border rounded-lg bg-secondary/50">
           <h3 className="font-semibold text-lg">Customer Information</h3>
-          <FormField control={form.control} name="usdotNumber" render={({ field }) => (<FormItem><FormLabel>USDOT Number</FormLabel><div className="flex gap-2"><FormControl><Input placeholder="Enter USDOT number" {...field} /></FormControl><Button type="button" onClick={() => {}} disabled={isUsdotLoading}>{isUsdotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button></div><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="usdotNumber" render={({ field }) => (<FormItem><FormLabel>USDOT Number</FormLabel><div className="flex gap-2"><FormControl><Input placeholder="Enter USDOT number" {...field} /></FormControl><Button type="button" onClick={handleUsdotLookup} disabled={isUsdotLoading}>{isUsdotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button></div><FormMessage /></FormItem>)} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField control={form.control} name="customerName" render={({ field }) => (<FormItem><FormLabel>Customer Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="company" render={({ field }) => (<FormItem><FormLabel>Company</FormLabel><FormControl><Input placeholder="e.g., Acme Trucking" {...field} /></FormControl><FormMessage /></FormItem>)} />
