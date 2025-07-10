@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Plus, DollarSign, Trash2, Loader2, Search, Edit, Printer, Mail, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "./SessionProvider";
 import { InvoiceTemplate } from "./InvoiceTemplate";
 import { renderToString } from 'react-dom/server';

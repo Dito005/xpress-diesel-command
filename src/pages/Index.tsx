@@ -13,7 +13,7 @@ import {
 import { useSession, type UserRole } from "@/components/SessionProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { FloatingAIHelper } from "@/components/FloatingAIHelper";
 import React from "react";

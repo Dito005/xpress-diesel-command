@@ -37,9 +37,9 @@ const App = () => {
         <BrowserRouter>
           <ErrorBoundary>
             <AppRoutes />
+            <Toaster />
           </ErrorBoundary>
         </BrowserRouter>
-        <Toaster />
       </SessionProvider>
     </QueryClientProvider>
   );

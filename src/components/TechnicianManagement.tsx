@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin, Trash2, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { TechnicianForm, Technician } from "./TechnicianForm";
 import { TechnicianTimeLogModal } from "./TechnicianTimeLogModal";
 import { supabase } from "@/integrations/supabase/client";
