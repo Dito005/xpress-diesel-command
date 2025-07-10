@@ -25,7 +25,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-const DashboardView = React.lazy(() => import("@/components/DashboardView").then(m => ({ default: m.DashboardView })));
 const JobBoard = React.lazy(() => import("@/components/JobBoard").then(m => ({ default: m.JobBoard })));
 const TechnicianDashboard = React.lazy(() => import("@/components/TechnicianDashboard").then(m => ({ default: m.TechnicianDashboard })));
 const JobDetailsModal = React.lazy(() => import("@/components/JobDetailsModal").then(m => ({ default: m.JobDetailsModal })));
@@ -42,7 +41,7 @@ const LoadingSpinner = () => (
 
 const Index = () => {
   const { userRole } = useSession();
-  const [activeView, setActiveView] = useState("dashboard");
+  const [activeView, setActiveView] = useState(userRole === 'admin' || userRole === 'manager' ? "job_board" : "tech_dashboard");
   const [selectedJob, setSelectedJob] = useState(null);
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
@@ -56,15 +55,7 @@ const Index = () => {
     navigate("/login");
   };
 
-  const handleInvoiceClick = (invoiceId: string) => {
-    // This is a simplified handler. A real implementation might fetch the invoice.
-    // For now, it switches to the invoicing view where the user can find it.
-    setActiveView('invoicing');
-    // You could pass the ID to the InvoicingSystem component if it's set up to handle it.
-  };
-
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager"] },
     { id: "job_board", label: "Job Board", icon: Wrench, roles: ["admin", "manager"] },
     { id: "tech_dashboard", label: "My Jobs", icon: Wrench, roles: ["tech", "road", "parts"] },
     { id: "technicians", label: "Technicians", icon: Users, roles: ["admin", "manager"] },
@@ -75,8 +66,6 @@ const Index = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case "dashboard":
-        return <DashboardView onInvoiceClick={handleInvoiceClick} />;
       case "job_board":
         return <JobBoard onJobClick={setSelectedJob} onGenerateInvoice={() => {}} />;
       case "tech_dashboard":
@@ -90,7 +79,7 @@ const Index = () => {
       case "settings":
         return <ShopSettings />;
       default:
-        return <div>Select a view</div>;
+        return <JobBoard onJobClick={setSelectedJob} onGenerateInvoice={() => {}} />;
     }
   };
 
@@ -141,7 +130,7 @@ const Index = () => {
         </main>
         <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
             <DialogTrigger asChild>
-                <Button className="fixed bottom-6 right-6 rounded-full h-14 w-14 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30">
+                <Button className="fixed bottom-6 right-6 rounded-full h-14 w-14 bg-primary hover:bg-primary/90 shadow-lg shadow-glow-orange">
                     <Bot className="h-7 w-7" />
                 </Button>
             </DialogTrigger>
@@ -173,7 +162,7 @@ const Index = () => {
       </div>
       <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
           <DialogTrigger asChild>
-              <Button className="fixed bottom-6 right-6 rounded-full h-16 w-16 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30 z-50">
+              <Button className="fixed bottom-6 right-6 rounded-full h-16 w-16 bg-primary hover:bg-primary/90 shadow-lg shadow-glow-orange z-50">
                   <Bot className="h-8 w-8" />
               </Button>
           </DialogTrigger>
