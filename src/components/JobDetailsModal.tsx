@@ -19,43 +19,56 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
   const { session } = useSession();
   const [currentTechId, setCurrentTechId] = useState(null);
   const [assignedTechNames, setAssignedTechNames] = useState('');
+  const [timeTracking, setTimeTracking] = useState({ estimated: 0, actual: 0 });
 
   useEffect(() => {
-    const fetchUserAndLog = async () => {
-      if (!session?.user?.id) return;
+    if (!job) return;
 
-      setCurrentTechId(session.user.id);
-      if (job?.id) {
-        const { data: log, error } = await supabase
-          .from('time_logs')
-          .select('*')
-          .eq('tech_id', session.user.id)
-          .eq('job_id', job.id)
-          .is('clock_out', null)
-          .single();
-        if (error && error.code !== 'PGRST116') {
-          console.error("Error fetching current job time log:", error);
-        } else {
-          setCurrentJobTimeLog(log);
-        }
+    setNotes(job.notes || "");
+    setActualService(job.actual_service || "");
+    setJobStatus(job.status || "open");
 
-        const { data: assignments, error: assignError } = await supabase
-          .from('job_assignments')
-          .select('techs(name)')
-          .eq('job_id', job.id);
+    const fetchDetails = async () => {
+      const techId = session?.user?.id;
+      if (techId) setCurrentTechId(techId);
 
-        if (assignError) {
-          console.error("Error fetching job assignments:", assignError);
-        } else {
-          const names = assignments.map((assign: { techs: Array<{ name: string | null }> | null }) => 
-            assign.techs?.[0]?.name
-          ).filter(Boolean).join(', ');
-          setAssignedTechNames(names);
-        }
+      const timeLogsPromise = supabase.from('time_logs').select('clock_in, clock_out').eq('job_id', job.id);
+      const assignmentsPromise = supabase.from('job_assignments').select('techs(name)').eq('job_id', job.id);
+      let currentLogPromise: PromiseLike<{ data: any; error: any; }> = Promise.resolve({ data: null, error: null });
+      if (techId) {
+        currentLogPromise = supabase.from('time_logs').select('*').eq('tech_id', techId).eq('job_id', job.id).is('clock_out', null).single();
       }
+
+      const [
+        { data: timeLogs, error: timeLogsError },
+        { data: assignments, error: assignError },
+        { data: currentLog, error: currentLogError }
+      ] = await Promise.all([timeLogsPromise, assignmentsPromise, currentLogPromise]);
+
+      if (timeLogsError) console.error("Error fetching time logs for job:", timeLogsError);
+      else {
+        const actualHours = timeLogs.reduce((total, log) => {
+          if (log.clock_in && log.clock_out) {
+            const duration = new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime();
+            return total + (duration / 3600000);
+          }
+          return total;
+        }, 0);
+        setTimeTracking({ estimated: job.estimated_hours || 0, actual: actualHours });
+      }
+
+      if (assignError) console.error("Error fetching job assignments:", assignError);
+      else {
+        const names = assignments.map((a: any) => a.techs?.name).filter(Boolean).join(', ');
+        setAssignedTechNames(names);
+      }
+
+      if (currentLogError && currentLogError.code !== 'PGRST116') console.error("Error fetching current job time log:", currentLogError);
+      else setCurrentJobTimeLog(currentLog);
     };
-    fetchUserAndLog();
-  }, [job?.id, session]);
+
+    fetchDetails();
+  }, [job, session]);
 
   if (!job) return null;
 
@@ -95,21 +108,16 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
         setCurrentJobTimeLog(null);
       }
     } else {
-      const { error } = await supabase
+      const { data: newLog, error } = await supabase
         .from('time_logs')
-        .insert({ tech_id: currentTechId, job_id: job.id, clock_in: new Date().toISOString(), type: 'job' });
+        .insert({ tech_id: currentTechId, job_id: job.id, clock_in: new Date().toISOString(), type: 'job' })
+        .select()
+        .single();
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
       } else {
         toast({ title: "Job Clocked In", description: "You have clocked in to this job." });
-        const { data: newLog } = await supabase
-          .from('time_logs')
-          .select('*')
-          .eq('tech_id', currentTechId)
-          .eq('job_id', job.id)
-          .is('clock_out', null)
-          .single();
         setCurrentJobTimeLog(newLog);
       }
     }
@@ -199,11 +207,11 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Estimated Hours</Label>
-                    <div className="text-xl font-bold text-blue-500">{job.estimated_hours || 0}h</div>
+                    <div className="text-xl font-bold text-blue-500">{timeTracking.estimated.toFixed(1)}h</div>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Clocked Hours</Label>
-                    <div className="text-xl font-bold text-green-500">{job.actual_hours || 0}h</div>
+                    <div className="text-xl font-bold text-green-500">{timeTracking.actual.toFixed(1)}h</div>
                   </div>
                 </div>
                 
@@ -212,11 +220,11 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
                   <div className="w-full bg-muted rounded-full h-2">
                     <div 
                       className="bg-primary h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${Math.min(((job.actual_hours || 0) / (job.estimated_hours || 1)) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((timeTracking.actual / (timeTracking.estimated || 1)) * 100, 100)}%` }}
                     ></div>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {Math.round(((job.actual_hours || 0) / (job.estimated_hours || 1)) * 100)}% Complete
+                    {Math.round((timeTracking.actual / (timeTracking.estimated || 1)) * 100)}% Complete
                   </div>
                 </div>
               </CardContent>

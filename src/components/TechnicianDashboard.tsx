@@ -14,63 +14,42 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
   const [currentJobLog, setCurrentJobLog] = useState(null);
   const [todaysLogs, setTodaysLogs] = useState([]);
   const { session } = useSession();
+  const [technicianProfile, setTechnicianProfile] = useState(null);
 
   const fetchTechnicianData = async (techId: string) => {
     if (!techId) return;
 
-    const { data: assignmentsData, error: assignmentsError } = await supabase
-      .from('job_assignments')
-      .select(`job_id, jobs(*)`)
-      .eq('tech_id', techId);
-
-    if (assignmentsError) {
-      console.error("Error fetching technician assignments:", assignmentsError);
-    } else {
-      const assignedJobs = assignmentsData.map(assignment => assignment.jobs).filter(Boolean);
-      setTechnicianJobs(assignedJobs);
-    }
-
-    const { data: shiftLog, error: shiftError } = await supabase
-      .from('time_logs')
-      .select('*')
-      .eq('tech_id', techId)
-      .is('clock_out', null)
-      .is('job_id', null)
-      .single();
-
-    if (shiftError && shiftError.code !== 'PGRST116') {
-      console.error("Error fetching current shift log:", shiftError);
-    } else {
-      setCurrentShiftLog(shiftLog);
-    }
-
-    const { data: jobLog, error: jobLogError } = await supabase
-      .from('time_logs')
-      .select('*')
-      .eq('tech_id', techId)
-      .is('clock_out', null)
-      .not('job_id', 'is', null)
-      .single();
-
-    if (jobLogError && jobLogError.code !== 'PGRST116') {
-      console.error("Error fetching current job log:", jobLogError);
-    } else {
-      setCurrentJobLog(jobLog);
-    }
-
+    const techProfilePromise = supabase.from('techs').select('*').eq('id', techId).single();
+    const assignmentsPromise = supabase.from('job_assignments').select(`job_id, jobs(*)`).eq('tech_id', techId);
+    const shiftLogPromise = supabase.from('time_logs').select('*').eq('tech_id', techId).is('clock_out', null).is('job_id', null).single();
+    const jobLogPromise = supabase.from('time_logs').select('*').eq('tech_id', techId).is('clock_out', null).not('job_id', 'is', null).single();
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const { data: todaysLogsData, error: todaysLogsError } = await supabase
-      .from('time_logs')
-      .select('*, jobs(status)')
-      .eq('tech_id', techId)
-      .gte('clock_in', today.toISOString());
+    const todaysLogsPromise = supabase.from('time_logs').select('*, jobs(status)').eq('tech_id', techId).gte('clock_in', today.toISOString());
 
-    if (todaysLogsError) {
-      console.error("Error fetching today's logs:", todaysLogsError);
-    } else {
-      setTodaysLogs(todaysLogsData || []);
-    }
+    const [
+      { data: techProfileData, error: techProfileError },
+      { data: assignmentsData, error: assignmentsError },
+      { data: shiftLog, error: shiftError },
+      { data: jobLog, error: jobLogError },
+      { data: todaysLogsData, error: todaysLogsError }
+    ] = await Promise.all([techProfilePromise, assignmentsPromise, shiftLogPromise, jobLogPromise, todaysLogsPromise]);
+
+    if (techProfileError) console.error("Error fetching technician profile:", techProfileError);
+    else setTechnicianProfile(techProfileData);
+
+    if (assignmentsError) console.error("Error fetching technician assignments:", assignmentsError);
+    else setTechnicianJobs(assignmentsData.map(a => a.jobs).filter(Boolean));
+
+    if (shiftError && shiftError.code !== 'PGRST116') console.error("Error fetching current shift log:", shiftError);
+    else setCurrentShiftLog(shiftLog);
+
+    if (jobLogError && jobLogError.code !== 'PGRST116') console.error("Error fetching current job log:", jobLogError);
+    else setCurrentJobLog(jobLog);
+
+    if (todaysLogsError) console.error("Error fetching today's logs:", todaysLogsError);
+    else setTodaysLogs(todaysLogsData || []);
   };
 
   useEffect(() => {
@@ -81,9 +60,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
 
     const channel = supabase
       .channel(`technician_dashboard_changes_${techId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => fetchTechnicianData(techId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_logs' }, () => fetchTechnicianData(techId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, () => fetchTechnicianData(techId))
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchTechnicianData(techId))
       .subscribe();
 
     return () => {
@@ -91,11 +68,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     };
   }, [session]);
 
-  const { todaysHours, jobsCompletedToday, jobsWorkedOnToday } = useMemo(() => {
-    if (!todaysLogs || todaysLogs.length === 0) {
-      return { todaysHours: '0.0', jobsCompletedToday: 0, jobsWorkedOnToday: 0 };
-    }
-
+  const { todaysHours, jobsCompletedToday, jobsWorkedOnToday, averageEfficiency } = useMemo(() => {
     let totalDuration = 0;
     const workedOnJobIds = new Set<string>();
     const completedJobIds = new Set<string>();
@@ -114,12 +87,21 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
 
     const hours = (totalDuration / 3600000).toFixed(1);
 
+    let avgEfficiency = 0;
+    if (technicianProfile?.efficiency_by_type) {
+      const efficiencies = Object.values(technicianProfile.efficiency_by_type).map(Number).filter(n => !isNaN(n) && n > 0);
+      if (efficiencies.length > 0) {
+        avgEfficiency = efficiencies.reduce((sum, val) => sum + val, 0) / efficiencies.length;
+      }
+    }
+
     return { 
       todaysHours: hours, 
       jobsCompletedToday: completedJobIds.size,
-      jobsWorkedOnToday: workedOnJobIds.size
+      jobsWorkedOnToday: workedOnJobIds.size,
+      averageEfficiency: avgEfficiency.toFixed(0)
     };
-  }, [todaysLogs]);
+  }, [todaysLogs, technicianProfile]);
 
   const handleClockInOutShift = async () => {
     const techId = session?.user?.id;
@@ -138,7 +120,6 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock out." });
       } else {
         toast({ title: "Clocked Out", description: "You have clocked out of your shift." });
-        fetchTechnicianData(techId);
       }
     } else {
       const { error } = await supabase
@@ -149,7 +130,6 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in." });
       } else {
         toast({ title: "Clocked In", description: "You have clocked in for your shift." });
-        fetchTechnicianData(techId);
       }
     }
   };
@@ -171,7 +151,6 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock out of job." });
       } else {
         toast({ title: "Job Clocked Out", description: "You have clocked out of the job." });
-        fetchTechnicianData(techId);
       }
     } else {
       if (currentJobLog) {
@@ -189,7 +168,6 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
       } else {
         toast({ title: "Job Clocked In", description: "You have clocked in to the job." });
-        fetchTechnicianData(techId);
       }
     }
   };
@@ -243,7 +221,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">{todaysHours}h</div>
-              <div className="text-xs text-gray-500">Efficiency: N/A</div>
+              <div className="text-xs text-gray-500">Efficiency: {averageEfficiency}%</div>
             </CardContent>
           </Card>
 
