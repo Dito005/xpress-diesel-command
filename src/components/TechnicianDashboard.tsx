@@ -68,14 +68,20 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     };
   }, [session]);
 
-  const { todaysHours, jobsCompletedToday, jobsWorkedOnToday, averageEfficiency } = useMemo(() => {
+  const { todaysHours, jobsCompletedToday, jobsWorkedOnToday, averageEfficiency, hoursWorkedPerJob } = useMemo(() => {
     let totalDuration = 0;
     const workedOnJobIds = new Set<string>();
     const completedJobIds = new Set<string>();
+    const jobHours = new Map<string, number>();
     
     todaysLogs.forEach(log => {
       if (log.clock_out) {
-        totalDuration += new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime();
+        const duration = new Date(log.clock_out).getTime() - new Date(log.clock_in).getTime();
+        totalDuration += duration;
+        if (log.job_id) {
+          const currentHours = jobHours.get(log.job_id) || 0;
+          jobHours.set(log.job_id, currentHours + duration);
+        }
       }
       if (log.job_id) {
         workedOnJobIds.add(log.job_id);
@@ -95,11 +101,17 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       }
     }
 
+    const jobHoursInHours = new Map<string, string>();
+    for (const [jobId, durationMs] of jobHours.entries()) {
+        jobHoursInHours.set(jobId, (durationMs / 3600000).toFixed(1));
+    }
+
     return { 
       todaysHours: hours, 
       jobsCompletedToday: completedJobIds.size,
       jobsWorkedOnToday: workedOnJobIds.size,
-      averageEfficiency: avgEfficiency.toFixed(0)
+      averageEfficiency: avgEfficiency.toFixed(0),
+      hoursWorkedPerJob: jobHoursInHours,
     };
   }, [todaysLogs, technicianProfile]);
 
@@ -254,78 +266,81 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {technicianJobs.map((job) => (
-            <Card 
-              key={job.id} 
-              className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
-              onClick={() => onJobClick(job)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold text-gray-900">
-                    {job.truck_vin.slice(-6)} - {job.job_type}
-                  </CardTitle>
-                  <Badge className={getStatusColor(job.status)} variant="outline">
-                    {job.status === "assigned" ? "Assigned" : 
-                     job.status === "in_progress" ? "In Progress" : "Completed"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <div className="font-medium text-gray-900">{job.description}</div>
-                  <div className="text-sm text-gray-600">{job.customer_name}</div>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Clock className="h-4 w-4" />
-                    Est. {job.estimated_hours || 0}h
-                    {job.actual_hours && ` • Worked: ${job.actual_hours}h`}
+          {technicianJobs.map((job) => {
+            const workedHours = hoursWorkedPerJob.get(job.id);
+            return (
+              <Card 
+                key={job.id} 
+                className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
+                onClick={() => onJobClick(job)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-semibold text-gray-900">
+                      {job.truck_vin.slice(-6)} - {job.job_type}
+                    </CardTitle>
+                    <Badge className={getStatusColor(job.status)} variant="outline">
+                      {job.status === "assigned" ? "Assigned" : 
+                       job.status === "in_progress" ? "In Progress" : "Completed"}
+                    </Badge>
                   </div>
-                  {job.priority === "high" && (
-                    <Badge variant="destructive" className="text-xs">High Priority</Badge>
-                  )}
-                </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <div className="font-medium text-gray-900">{job.description}</div>
+                    <div className="text-sm text-gray-600">{job.customer_name}</div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Clock className="h-4 w-4" />
+                      Est. {job.estimated_hours || 0}h
+                      {workedHours && ` • Worked: ${workedHours}h`}
+                    </div>
+                    {job.priority === "high" && (
+                      <Badge variant="destructive" className="text-xs">High Priority</Badge>
+                    )}
+                  </div>
 
-                {userRole === "tech" && (
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      size="sm" 
-                      className="flex-1 bg-blue-600 hover:bg-blue-700"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClockInOutJob(job.id);
-                      }}
-                      disabled={currentJobLog && currentJobLog.job_id !== job.id}
-                    >
-                      {currentJobLog && currentJobLog.job_id === job.id ? (
-                        <>
-                          <Pause className="h-4 w-4 mr-1" />
-                          Clock Out Job
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-1" />
-                          Clock In Job
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onJobClick(job);
-                      }}
-                    >
-                      View Details
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  {userRole === "tech" && (
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        size="sm" 
+                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClockInOutJob(job.id);
+                        }}
+                        disabled={currentJobLog && currentJobLog.job_id !== job.id}
+                      >
+                        {currentJobLog && currentJobLog.job_id === job.id ? (
+                          <>
+                            <Pause className="h-4 w-4 mr-1" />
+                            Clock Out Job
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-1" />
+                            Clock In Job
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onJobClick(job);
+                        }}
+                      >
+                        View Details
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       </div>
 
