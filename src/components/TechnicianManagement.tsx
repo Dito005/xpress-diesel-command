@@ -88,18 +88,18 @@ export const TechnicianManagement = () => {
 
   const getRoleBadgeColor = (role: string) => {
     switch(role) {
-      case 'lead': return 'bg-purple-100 text-purple-800';
-      case 'senior': return 'bg-blue-100 text-blue-800';
-      case 'junior': return 'bg-green-100 text-green-800';
-      case 'apprentice': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'lead': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300';
+      case 'senior': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
+      case 'junior': return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
+      case 'apprentice': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
 
   const getEfficiencyColor = (efficiency: number) => {
-    if (efficiency >= 90) return 'text-green-600';
-    if (efficiency >= 80) return 'text-yellow-600';
-    return 'text-red-600';
+    if (efficiency >= 90) return 'text-green-500';
+    if (efficiency >= 80) return 'text-yellow-500';
+    return 'text-red-500';
   };
 
   if (isLoading) {
@@ -109,13 +109,13 @@ export const TechnicianManagement = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
           <Users className="h-6 w-6" />
           Technician Management
         </h2>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
               Add Technician
             </Button>
@@ -132,16 +132,15 @@ export const TechnicianManagement = () => {
         </Dialog>
       </div>
 
-      {/* Team Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Technicians</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Technicians</p>
                 <p className="text-2xl font-bold">{technicians.length}</p>
               </div>
-              <Users className="h-8 w-8 text-blue-600" />
+              <Users className="h-8 w-8 text-blue-500 dark:text-blue-400" />
             </div>
           </CardContent>
         </Card>
@@ -149,10 +148,10 @@ export const TechnicianManagement = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active</p>
-                <p className="text-2xl font-bold text-green-600">{technicians.filter(t => t.active).length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-500">{technicians.filter(t => t.active).length}</p>
               </div>
-              <Star className="h-8 w-8 text-green-600" />
+              <Star className="h-8 w-8 text-green-600 dark:text-green-500" />
             </div>
           </CardContent>
         </Card>
@@ -160,12 +159,12 @@ export const TechnicianManagement = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg Efficiency</p>
-                <p className="text-2xl font-bold text-yellow-600">
+                <p className="text-sm font-medium text-muted-foreground">Avg Efficiency</p>
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500">
                   {technicians.length > 0 ? Math.round(technicians.reduce((sum, t) => sum + t.efficiency, 0) / technicians.length) : 0}%
                 </p>
               </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
+              <Clock className="h-8 w-8 text-yellow-600 dark:text-yellow-500" />
             </div>
           </CardContent>
         </Card>
@@ -173,18 +172,17 @@ export const TechnicianManagement = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Road Techs</p>
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-sm font-medium text-muted-foreground">Road Techs</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-500">
                   {technicians.filter(t => t.location === 'road' || t.location === 'both').length}
                 </p>
               </div>
-              <Wrench className="h-8 w-8 text-purple-600" />
+              <Wrench className="h-8 w-8 text-purple-600 dark:text-purple-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Technician List */}
       <Card>
         <CardHeader>
           <CardTitle>Team Members</CardTitle>
@@ -192,21 +190,21 @@ export const TechnicianManagement = () => {
         <CardContent>
           <div className="space-y-4">
             {technicians.map((tech) => (
-              <div key={tech.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div key={tech.id} className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-gray-900">{tech.name}</h3>
+                    <h3 className="font-semibold">{tech.name}</h3>
                     <Badge className={getRoleBadgeColor(tech.role)}>
                       {tech.role}
                     </Badge>
                     {!tech.active && (
-                      <Badge variant="outline" className="bg-gray-100 text-gray-600">
+                      <Badge variant="outline" className="bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                         Inactive
                       </Badge>
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{tech.phone}</div>
                     <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{tech.email}</div>
                     <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{tech.location}</div>

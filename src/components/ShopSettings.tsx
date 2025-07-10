@@ -13,6 +13,12 @@ import { useSession } from "./SessionProvider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BusinessCostsSettings } from "./BusinessCostsSettings";
 
+const AI_MODELS_BY_PROVIDER: Record<string, string[]> = {
+  openai: ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
+  gemini: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"],
+  copilot: ["copilot-3", "copilot-2"], // Note: These are illustrative names
+};
+
 const fetchSettings = async (): Promise<Record<string, any>> => {
   const { data: generalSettings, error: generalError } = await supabase.from('settings').select('key, value');
   if (generalError) throw new Error(generalError.message);
@@ -40,9 +46,9 @@ export const ShopSettings = () => {
   });
 
   const [aiSettings, setAiSettings] = useState({
-    ai_provider: '',
+    ai_provider: 'openai',
     ai_api_key: '',
-    ai_model: '',
+    ai_model: 'gpt-4o',
     ai_enabled: false,
   });
 
@@ -61,7 +67,7 @@ export const ShopSettings = () => {
       setAiSettings({
         ai_provider: settings.ai_provider || 'openai',
         ai_api_key: settings.ai_api_key || '',
-        ai_model: settings.ai_model || 'gpt-4',
+        ai_model: settings.ai_model || 'gpt-4o',
         ai_enabled: settings.ai_enabled === 'true',
       });
       setInvoiceSettings({
@@ -75,6 +81,13 @@ export const ShopSettings = () => {
       });
     }
   }, [settings]);
+
+  useEffect(() => {
+    const availableModels = AI_MODELS_BY_PROVIDER[aiSettings.ai_provider] || [];
+    if (!availableModels.includes(aiSettings.ai_model)) {
+      setAiSettings(prev => ({ ...prev, ai_model: availableModels[0] || '' }));
+    }
+  }, [aiSettings.ai_provider, aiSettings.ai_model]);
 
   const updateGeneralSettingsMutation = useMutation({
     mutationFn: async (newSettings: { key: string; value: string }[]) => {
@@ -118,10 +131,12 @@ export const ShopSettings = () => {
     updateInvoiceSettingsMutation.mutate(invoiceSettings);
   };
 
+  const availableModels = AI_MODELS_BY_PROVIDER[aiSettings.ai_provider] || [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-50 flex items-center gap-2">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
           <Settings className="h-6 w-6" />
           Shop Settings
         </h2>
@@ -135,7 +150,7 @@ export const ShopSettings = () => {
         </TabsList>
 
         <TabsContent value="invoicing" className="space-y-4">
-          <Card className="bg-slate-900 border-slate-800">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <InvoiceIcon className="h-5 w-5" />
@@ -164,19 +179,19 @@ export const ShopSettings = () => {
         </TabsContent>
 
         <TabsContent value="ai" className="space-y-4">
-          <Card className="bg-slate-900 border-slate-800">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" />AI Assistant Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {isLoadingSettings ? <Loader2 className="animate-spin" /> : <>
                 <div className="flex items-center justify-between">
-                  <div><Label>Enable AI Assistant</Label><p className="text-sm text-gray-600">Toggle the AI chatbot for all users.</p></div>
+                  <div><Label>Enable AI Assistant</Label><p className="text-sm text-muted-foreground">Toggle the AI chatbot for all users.</p></div>
                   <Switch checked={aiSettings.ai_enabled} onCheckedChange={(checked) => setAiSettings(prev => ({ ...prev, ai_enabled: checked }))} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div><Label htmlFor="aiProvider">AI Provider</Label><Select value={aiSettings.ai_provider} onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_provider: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="openai">OpenAI</SelectItem><SelectItem value="gemini">Google Gemini</SelectItem><SelectItem value="copilot">Microsoft Copilot</SelectItem></SelectContent></Select></div>
-                  <div><Label htmlFor="aiModel">AI Model</Label><Select value={aiSettings.ai_model} onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_model: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="gpt-4o">GPT-4o</SelectItem><SelectItem value="gpt-4">GPT-4</SelectItem><SelectItem value="gpt-3.5-turbo">GPT-3.5-Turbo</SelectItem></SelectContent></Select></div>
+                  <div><Label htmlFor="aiProvider">AI Provider</Label><Select value={aiSettings.ai_provider} onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_provider: value }))}><SelectTrigger id="aiProvider"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="openai">OpenAI</SelectItem><SelectItem value="gemini">Google Gemini</SelectItem><SelectItem value="copilot">Microsoft Copilot</SelectItem></SelectContent></Select></div>
+                  <div><Label htmlFor="aiModel">AI Model</Label><Select value={aiSettings.ai_model} onValueChange={(value) => setAiSettings(prev => ({ ...prev, ai_model: value }))}><SelectTrigger id="aiModel"><SelectValue /></SelectTrigger><SelectContent>{availableModels.map(model => (<SelectItem key={model} value={model}>{model}</SelectItem>))}</SelectContent></Select></div>
                 </div>
                 <div><Label htmlFor="apiKey">API Key</Label><Input id="apiKey" type="password" placeholder="Enter your API key" value={aiSettings.ai_api_key} onChange={(e) => setAiSettings(prev => ({ ...prev, ai_api_key: e.target.value }))} /></div>
                 <Button onClick={handleAiSettingsSave} disabled={updateGeneralSettingsMutation.isPending}>{updateGeneralSettingsMutation.isPending ? "Saving..." : "Save AI Settings"}</Button>

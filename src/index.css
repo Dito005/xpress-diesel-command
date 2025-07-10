@@ -11,7 +11,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 24.6 95% 53.1%; /* Orange */
-    --primary-foreground: 210 20% 98%;
+    --primary-foreground: 222.2 84% 4.9%; /* CHANGED for better contrast */
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 215.4 16.3% 46.9%;
     --muted: 210 40% 96.1%;
