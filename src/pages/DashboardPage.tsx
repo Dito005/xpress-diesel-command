@@ -1,6 +1,7 @@
 import { JobBoard } from '@/components/JobBoard'; // Import JobBoard
 
-export const DashboardPage = ({
+// Changed to only a default export
+const DashboardPage = ({
   onJobClick,
   onGenerateInvoice,
   onOpenInvoiceEditor,
