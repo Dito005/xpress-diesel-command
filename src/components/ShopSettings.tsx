@@ -3,15 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Building, DollarSign, Clock, Save, Home, Bot, FileText as InvoiceIcon } from "lucide-react";
+import { Settings, Bot, FileText as InvoiceIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "./SessionProvider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BusinessCostsSettings } from "./BusinessCostsSettings";
 
 const fetchSettings = async (): Promise<Record<string, any>> => {
   const { data: generalSettings, error: generalError } = await supabase.from('settings').select('key, value');
@@ -121,25 +121,21 @@ export const ShopSettings = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h2 className="text-2xl font-bold text-slate-50 flex items-center gap-2">
           <Settings className="h-6 w-6" />
           Shop Settings
         </h2>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
+      <Tabs defaultValue="invoicing" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing Rules</TabsTrigger>
+          <TabsTrigger value="costs">Business Costs</TabsTrigger>
           {userRole === 'admin' && <TabsTrigger value="ai">AI Assistant</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="general" className="space-y-4">
-          {/* General settings content here */}
-        </TabsContent>
-
         <TabsContent value="invoicing" className="space-y-4">
-          <Card>
+          <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <InvoiceIcon className="h-5 w-5" />
@@ -191,8 +187,12 @@ export const ShopSettings = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="costs">
+          <BusinessCostsSettings />
+        </TabsContent>
+
         <TabsContent value="ai" className="space-y-4">
-          <Card>
+          <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bot className="h-5 w-5" />

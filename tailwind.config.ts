@@ -22,6 +22,9 @@ export default {
         sans: ["Inter", "sans-serif"],
       },
 			colors: {
+        'neon-blue': 'hsl(200, 100%, 50%)',
+        'neon-purple': 'hsl(280, 100%, 60%)',
+        'neon-green': 'hsl(140, 100%, 50%)',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -66,6 +69,11 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				}
 			},
+      boxShadow: {
+        'glow-blue': '0 0 15px 0px hsl(200, 100%, 50%, 0.6)',
+        'glow-purple': '0 0 15px 0px hsl(280, 100%, 60%, 0.6)',
+        'glow-green': '0 0 15px 0px hsl(140, 100%, 50%, 0.6)',
+      },
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',

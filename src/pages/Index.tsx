@@ -5,10 +5,7 @@ import {
   Users,
   Wrench,
   FileText,
-  Truck,
-  Package,
   DollarSign,
-  Database,
   Settings,
   Bot,
   LogOut,
@@ -21,28 +18,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AIHelper } from "@/components/AIHelper";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+const DashboardView = React.lazy(() => import("@/components/DashboardView").then(m => ({ default: m.DashboardView })));
 const JobBoard = React.lazy(() => import("@/components/JobBoard").then(m => ({ default: m.JobBoard })));
 const TechnicianDashboard = React.lazy(() => import("@/components/TechnicianDashboard").then(m => ({ default: m.TechnicianDashboard })));
 const JobDetailsModal = React.lazy(() => import("@/components/JobDetailsModal").then(m => ({ default: m.JobDetailsModal })));
-const PartsRunnerDashboard = React.lazy(() => import("@/components/PartsRunnerDashboard").then(m => ({ default: m.PartsRunnerDashboard })));
-const RoadServiceDashboard = React.lazy(() => import("@/components/RoadServiceDashboard").then(m => ({ default: m.RoadServiceDashboard })));
 const ReportsAnalytics = React.lazy(() => import("@/components/ReportsAnalytics").then(m => ({ default: m.ReportsAnalytics })));
 const InvoicingSystem = React.lazy(() => import("@/components/InvoicingSystem").then(m => ({ default: m.InvoicingSystem })));
 const ShopSettings = React.lazy(() => import("@/components/ShopSettings").then(m => ({ default: m.ShopSettings })));
 const TechnicianManagement = React.lazy(() => import("@/components/TechnicianManagement").then(m => ({ default: m.TechnicianManagement })));
-const BusinessCosts = React.lazy(() => import("@/components/BusinessCosts").then(m => ({ default: m.BusinessCosts })));
-const AIJobAnalyzer = React.lazy(() => import("@/components/AIJobAnalyzer").then(m => ({ default: m.AIJobAnalyzer })));
-const WorkflowOrchestrator = React.lazy(() => import("@/components/WorkflowOrchestrator").then(m => ({ default: m.WorkflowOrchestrator })));
-const PartsLookupTool = React.lazy(() => import("@/components/PartsLookupTool").then(m => ({ default: m.PartsLookupTool })));
-const PricingAI = React.lazy(() => import("@/components/PricingAI").then(m => ({ default: m.PricingAI })));
-const TechnicianList = React.lazy(() => import("@/components/TechnicianList").then(m => ({ default: m.TechnicianList })));
-
 
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-full">
@@ -69,50 +59,27 @@ const Index = () => {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager"] },
     { id: "job_board", label: "Job Board", icon: Wrench, roles: ["admin", "manager"] },
-    { id: "tech_dashboard", label: "My Jobs", icon: Wrench, roles: ["tech"] },
-    { id: "road_service", label: "Road Service", icon: Truck, roles: ["admin", "manager", "road"] },
-    { id: "parts_runner", label: "Parts Runner", icon: Package, roles: ["admin", "manager", "parts"] },
+    { id: "tech_dashboard", label: "My Jobs", icon: Wrench, roles: ["tech", "road", "parts"] },
     { id: "technicians", label: "Technicians", icon: Users, roles: ["admin", "manager"] },
     { id: "invoicing", label: "Invoicing", icon: FileText, roles: ["admin", "manager"] },
     { id: "reports", label: "Reports", icon: DollarSign, roles: ["admin", "manager"] },
-    { id: "costs", label: "Business Costs", icon: Database, roles: ["admin"] },
-    { id: "pricing_ai", label: "Pricing AI", icon: Bot, roles: ["admin"] },
     { id: "settings", label: "Settings", icon: Settings, roles: ["admin"] },
   ].filter(item => item.roles.includes(userRole || "unassigned"));
 
   const renderView = () => {
     switch (activeView) {
       case "dashboard":
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <AIJobAnalyzer />
-              <WorkflowOrchestrator />
-            </div>
-            <div className="space-y-6">
-              <TechnicianList />
-              <PartsLookupTool />
-            </div>
-          </div>
-        );
+        return <DashboardView />;
       case "job_board":
         return <JobBoard onJobClick={setSelectedJob} onGenerateInvoice={() => {}} />;
       case "tech_dashboard":
         return <TechnicianDashboard userRole={userRole} onJobClick={setSelectedJob} />;
-      case "road_service":
-        return <RoadServiceDashboard onJobClick={setSelectedJob} />;
-      case "parts_runner":
-        return <PartsRunnerDashboard onJobClick={setSelectedJob} />;
       case "technicians":
         return <TechnicianManagement />;
       case "invoicing":
         return <InvoicingSystem isOpen={isInvoiceEditorOpen} setIsOpen={setIsInvoiceEditorOpen} editingInvoice={editingInvoice} onSuccess={() => setIsInvoiceEditorOpen(false)} onOpenEditor={(inv) => { setEditingInvoice(inv); setIsInvoiceEditorOpen(true); }} />;
       case "reports":
         return <ReportsAnalytics />;
-      case "costs":
-        return <BusinessCosts />;
-      case "pricing_ai":
-        return <PricingAI />;
       case "settings":
         return <ShopSettings />;
       default:
@@ -121,8 +88,8 @@ const Index = () => {
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-card text-card-foreground">
-      <div className="p-4 border-b">
+    <div className="flex flex-col h-full bg-slate-900 text-slate-200">
+      <div className="p-4 border-b border-slate-800">
         <h1 className={`font-bold text-xl ${isSidebarCollapsed && !isMobile ? 'text-center' : ''}`}>
           {isSidebarCollapsed && !isMobile ? 'XD' : 'Xpress Diesel'}
         </h1>
@@ -132,7 +99,7 @@ const Index = () => {
           <Button
             key={item.id}
             variant={activeView === item.id ? "secondary" : "ghost"}
-            className={`w-full justify-start ${isSidebarCollapsed && !isMobile ? 'justify-center' : ''}`}
+            className={`w-full justify-start hover:bg-slate-800 ${isSidebarCollapsed && !isMobile ? 'justify-center' : ''}`}
             onClick={() => setActiveView(item.id)}
           >
             <item.icon className={`h-5 w-5 ${isSidebarCollapsed && !isMobile ? '' : 'mr-3'}`} />
@@ -140,12 +107,8 @@ const Index = () => {
           </Button>
         ))}
       </nav>
-      <div className="p-2 border-t">
-        <Button variant="ghost" className="w-full justify-start" onClick={() => setIsAiHelperOpen(true)}>
-          <Bot className={`h-5 w-5 ${isSidebarCollapsed && !isMobile ? '' : 'mr-3'}`} />
-          {!isSidebarCollapsed || isMobile ? 'AI Assistant' : ''}
-        </Button>
-        <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+      <div className="p-2 border-t border-slate-800">
+        <Button variant="ghost" className="w-full justify-start hover:bg-slate-800" onClick={handleLogout}>
           <LogOut className={`h-5 w-5 ${isSidebarCollapsed && !isMobile ? '' : 'mr-3'}`} />
           {!isSidebarCollapsed || isMobile ? 'Logout' : ''}
         </Button>
@@ -162,18 +125,23 @@ const Index = () => {
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
+          <SheetContent side="left" className="p-0 w-64 bg-slate-900 border-r-slate-800">
             <SidebarContent />
           </SheetContent>
         </Sheet>
         <main className="flex-1 p-4 pt-20 overflow-y-auto">
           <Suspense fallback={<LoadingSpinner />}>{renderView()}</Suspense>
         </main>
-        <Sheet open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
-          <SheetContent side="right" className="p-0">
-            <AIHelper />
-          </SheetContent>
-        </Sheet>
+        <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
+            <DialogTrigger asChild>
+                <Button className="fixed bottom-6 right-6 rounded-full h-14 w-14 bg-neon-blue hover:bg-blue-500 shadow-lg shadow-neon-blue/30">
+                    <Bot className="h-7 w-7" />
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="p-0 max-w-md h-[70vh] flex flex-col bg-slate-900 border-slate-800">
+                <AIHelper />
+            </DialogContent>
+        </Dialog>
         {selectedJob && <JobDetailsModal job={selectedJob} onClose={() => setSelectedJob(null)} userRole={userRole} onGenerateInvoice={() => {}} />}
       </div>
     );
@@ -185,20 +153,27 @@ const Index = () => {
         <SidebarContent />
       </aside>
       <div className="relative flex-1 flex flex-col">
-        <header className="flex items-center justify-between p-4 border-b">
+        <header className="flex items-center justify-between p-4 border-b border-slate-800">
           <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}>
             {isSidebarCollapsed ? <ChevronRight /> : <ChevronLeft />}
           </Button>
           <h2 className="text-xl font-semibold capitalize">{activeView.replace('_', ' ')}</h2>
-          <div>{/* Placeholder for user avatar or other header items */}</div>
+          <div></div>
         </header>
         <main className="flex-1 p-6 overflow-y-auto">
           <Suspense fallback={<LoadingSpinner />}>{renderView()}</Suspense>
         </main>
       </div>
-      <aside className={`transition-all duration-300 ${isAiHelperOpen ? 'w-96' : 'w-0'}`}>
-        {isAiHelperOpen && <AIHelper />}
-      </aside>
+      <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
+          <DialogTrigger asChild>
+              <Button className="fixed bottom-6 right-6 rounded-full h-16 w-16 bg-neon-blue hover:bg-blue-500 shadow-lg shadow-neon-blue/30 z-50">
+                  <Bot className="h-8 w-8" />
+              </Button>
+          </DialogTrigger>
+          <DialogContent className="p-0 max-w-md h-[70vh] flex flex-col bg-slate-900 border-slate-800">
+              <AIHelper />
+          </DialogContent>
+      </Dialog>
       {selectedJob && <JobDetailsModal job={selectedJob} onClose={() => setSelectedJob(null)} userRole={userRole} onGenerateInvoice={() => {}} />}
     </div>
   );
