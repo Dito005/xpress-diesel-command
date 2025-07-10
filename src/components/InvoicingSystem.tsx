@@ -118,8 +118,10 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
     }
     const grandTotal = totalBeforeCC + ccFee;
     setTotals({ subtotal, tax: totalTax, grandTotal, ccFee });
-    form.setValue('grandTotal', grandTotal);
-  }, [watchedValues, invoiceSettings, form]);
+    if (form.getValues('grandTotal') !== grandTotal) {
+      form.setValue('grandTotal', grandTotal);
+    }
+  }, [watchedValues, invoiceSettings, form.getValues, form.setValue]);
 
   useEffect(() => {
     const channel = supabase.channel('invoicing-changes').on('postgres_changes', { event: '*', schema: 'public' }, () => queryClient.invalidateQueries({ queryKey: ['invoicingData'] })).subscribe();
