@@ -1,10 +1,17 @@
 import React from 'react';
 
-export const InvoiceTemplate = React.forwardRef(({ invoice, totals, settings, companyInfo }, ref) => {
+interface InvoiceTemplateProps {
+  invoice: any;
+  totals: any;
+  settings: any;
+  companyInfo: any;
+}
+
+export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ invoice, totals, settings, companyInfo }, ref) => {
   if (!invoice || !totals || !settings || !companyInfo) return null;
 
-  const getStatusStyle = (status) => {
-    const styles = {
+  const getStatusStyle = (status: string) => {
+    const styles: Record<string, { color: string; borderColor: string }> = {
       paid: { color: '#16a34a', borderColor: '#16a34a' },
       sent: { color: '#2563eb', borderColor: '#2563eb' },
       pending: { color: '#f97316', borderColor: '#f97316' },
@@ -66,7 +73,7 @@ export const InvoiceTemplate = React.forwardRef(({ invoice, totals, settings, co
           </tr>
         </thead>
         <tbody>
-          {invoice.invoice_labor?.map(l => (
+          {invoice.invoice_labor?.map((l: any) => (
             <tr key={`labor-${l.id}`}>
               <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>Labor: {l.techs?.name}</td>
               <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>{l.hours_worked}</td>
@@ -74,7 +81,7 @@ export const InvoiceTemplate = React.forwardRef(({ invoice, totals, settings, co
               <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>${(l.hours_worked * l.hourly_rate).toFixed(2)}</td>
             </tr>
           ))}
-          {invoice.invoice_parts?.map(p => (
+          {invoice.invoice_parts?.map((p: any) => (
             <tr key={`part-${p.id}`}>
               <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>Part: {p.parts?.name}</td>
               <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>{p.quantity}</td>
@@ -91,7 +98,7 @@ export const InvoiceTemplate = React.forwardRef(({ invoice, totals, settings, co
             <span>Subtotal</span>
             <span>${totals.subtotal.toFixed(2)}</span>
           </div>
-          {invoice.misc_fees?.map((fee, i) => (
+          {invoice.misc_fees?.map((fee: any, i: number) => (
             <div key={`fee-${i}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0' }}>
               <span>{fee.description}</span>
               <span>${fee.amount.toFixed(2)}</span>

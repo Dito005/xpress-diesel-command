@@ -106,16 +106,16 @@ const Index = () => {
     };
   }, [session]);
 
-  const handleJobClick = (job) => {
+  const handleJobClick = (job: any) => {
     setSelectedJob(job);
   };
 
-  const handleOpenInvoiceEditor = (invoice = null) => {
+  const handleOpenInvoiceEditor = (invoice: any = null) => {
     setEditingInvoice(invoice);
     setIsInvoiceModalOpen(true);
   };
 
-  const handleGenerateInvoiceFromJob = async (job) => {
+  const handleGenerateInvoiceFromJob = async (job: any) => {
     if (!job) return;
 
     const { data: newInvoice, error } = await supabase
@@ -261,7 +261,18 @@ const Index = () => {
           <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
           <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>
-          <TabsContent value="invoicing"><InvoicingSystem onOpenEditor={handleOpenInvoiceEditor} /></TabsContent>
+          <TabsContent value="invoicing">
+            <InvoicingSystem 
+              isOpen={isInvoiceModalOpen}
+              setIsOpen={setIsInvoiceModalOpen}
+              editingInvoice={editingInvoice}
+              onSuccess={() => {
+                setIsInvoiceModalOpen(false);
+                setEditingInvoice(null);
+              }}
+              onOpenEditor={handleOpenInvoiceEditor} 
+            />
+          </TabsContent>
           <TabsContent value="reports"><ReportsAnalytics /></TabsContent>
           <TabsContent value="parts-lookup"><PartsLookupTool /></TabsContent>
           <TabsContent value="costs"><BusinessCosts /></TabsContent>
@@ -274,16 +285,6 @@ const Index = () => {
         onClose={() => setSelectedJob(null)} 
         userRole={userRole}
         onGenerateInvoice={handleGenerateInvoiceFromJob}
-      />
-
-      <InvoicingSystem 
-        isOpen={isInvoiceModalOpen}
-        setIsOpen={setIsInvoiceModalOpen}
-        editingInvoice={editingInvoice}
-        onSuccess={() => {
-          setIsInvoiceModalOpen(false);
-          setEditingInvoice(null);
-        }}
       />
     </div>
   );

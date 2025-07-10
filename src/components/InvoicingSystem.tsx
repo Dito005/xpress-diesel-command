@@ -48,7 +48,15 @@ const invoiceSchema = z.object({
   grandTotal: z.number().min(0.01, "Grand Total must be greater than zero."),
 });
 
-export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, onOpenEditor }) => {
+interface InvoicingSystemProps {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+  editingInvoice: any;
+  onSuccess: () => void;
+  onOpenEditor: (invoice?: any) => void;
+}
+
+export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, onOpenEditor }: InvoicingSystemProps) => {
   const { toast } = useToast();
   const { session } = useSession();
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -213,7 +221,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
   };
 
   const handleSendEmail = async () => {
-    const invoiceHtml = renderToString(<InvoiceTemplate invoice={editingInvoice} totals={totals} settings={invoiceSettings} companyInfo={{}} />);
+    const invoiceHtml = renderToString(<InvoiceTemplate ref={printRef} invoice={editingInvoice} totals={totals} settings={invoiceSettings} companyInfo={{}} />);
     const { error } = await supabase.functions.invoke('send-invoice-email', {
       body: {
         toEmail: editingInvoice.jobs.customer_email,
