@@ -22,9 +22,7 @@ export default {
         sans: ["Inter", "sans-serif"],
       },
 			colors: {
-        'neon-blue': 'hsl(200, 100%, 50%)',
-        'neon-purple': 'hsl(280, 100%, 60%)',
-        'neon-green': 'hsl(140, 100%, 50%)',
+        'neon-orange': 'hsl(24.6, 95%, 53.1%)',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -58,21 +56,9 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
-				}
 			},
       boxShadow: {
-        'glow-blue': '0 0 15px 0px hsl(200, 100%, 50%, 0.6)',
-        'glow-purple': '0 0 15px 0px hsl(280, 100%, 60%, 0.6)',
-        'glow-green': '0 0 15px 0px hsl(140, 100%, 50%, 0.6)',
+        'glow-orange': '0 0 15px 0px hsl(24.6, 95%, 53.1%, 0.6)',
       },
 			borderRadius: {
 				lg: 'var(--radius)',

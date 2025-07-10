@@ -6,39 +6,28 @@ interface KpiCardProps {
   title: string;
   metric: string;
   subtext: string;
-  color: 'blue' | 'purple' | 'green';
   onClick?: () => void;
 }
 
-export const KpiCard = ({ title, metric, subtext, color, onClick }: KpiCardProps) => {
-  const glowClasses = {
-    blue: 'hover:shadow-glow-blue',
-    purple: 'hover:shadow-glow-purple',
-    green: 'hover:shadow-glow-green',
-  };
-
-  const borderClasses = {
-    blue: 'border-neon-blue/30',
-    purple: 'border-neon-purple/30',
-    green: 'border-neon-green/30',
-  }
-
+export const KpiCard = ({ title, metric, subtext, onClick }: KpiCardProps) => {
   return (
-    <Card className={`bg-slate-900/50 border-slate-800 group transition-all ${glowClasses[color]}`}>
+    <Card className="bg-card border-border group transition-all hover:shadow-glow-orange hover:border-primary/50">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm font-medium text-slate-400">{title}</CardTitle>
-        <div className={`w-2 h-2 rounded-full ${borderClasses[color].replace('border-', 'bg-')}`}></div>
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <div className="w-2 h-2 rounded-full bg-primary/50"></div>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-slate-50">{metric}</div>
-        <p className="text-xs text-slate-500 mt-1">{subtext}</p>
-        <Button
-          variant="ghost"
-          className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-slate-50 px-0"
-          onClick={onClick}
-        >
-          <ArrowUpRight className="h-4 w-4 mr-2" /> View Detail
-        </Button>
+        <div className="text-3xl font-bold text-foreground">{metric}</div>
+        <p className="text-xs text-muted-foreground mt-1">{subtext}</p>
+        {onClick && (
+          <Button
+            variant="ghost"
+            className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground px-0"
+            onClick={onClick}
+          >
+            <ArrowUpRight className="h-4 w-4 mr-2" /> View Detail
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

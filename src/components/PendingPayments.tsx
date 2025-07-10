@@ -43,21 +43,21 @@ export const PendingPayments = ({ onInvoiceClick }) => {
       </CardHeader>
       <CardContent className="space-y-3 max-h-96 overflow-y-auto">
         {pendingInvoices.length === 0 ? (
-          <p className="text-center text-gray-500 py-4">No pending payments.</p>
+          <p className="text-center text-muted-foreground py-4">No pending payments.</p>
         ) : (
           pendingInvoices.map(invoice => (
             <div 
               key={invoice.id} 
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+              className="flex items-center justify-between p-3 bg-secondary rounded-lg cursor-pointer hover:bg-accent"
               onClick={() => onInvoiceClick(invoice.id)}
             >
               <div>
                 <p className="font-semibold">{invoice.jobs?.customer_name || 'N/A'}</p>
-                <p className="text-sm text-gray-600">VIN: {invoice.jobs?.truck_vin?.slice(-6) || 'N/A'}</p>
+                <p className="text-sm text-muted-foreground">VIN: {invoice.jobs?.truck_vin?.slice(-6) || 'N/A'}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-lg text-green-600">${invoice.grand_total?.toLocaleString()}</p>
-                <p className="text-xs text-gray-500 flex items-center justify-end gap-1">
+                <p className="font-bold text-lg text-primary">${invoice.grand_total?.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                   <Clock className="h-3 w-3" />
                   {new Date(invoice.created_at).toLocaleDateString()}
                 </p>

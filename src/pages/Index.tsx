@@ -56,6 +56,13 @@ const Index = () => {
     navigate("/login");
   };
 
+  const handleInvoiceClick = (invoiceId: string) => {
+    // This is a simplified handler. A real implementation might fetch the invoice.
+    // For now, it switches to the invoicing view where the user can find it.
+    setActiveView('invoicing');
+    // You could pass the ID to the InvoicingSystem component if it's set up to handle it.
+  };
+
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager"] },
     { id: "job_board", label: "Job Board", icon: Wrench, roles: ["admin", "manager"] },
@@ -69,7 +76,7 @@ const Index = () => {
   const renderView = () => {
     switch (activeView) {
       case "dashboard":
-        return <DashboardView />;
+        return <DashboardView onInvoiceClick={handleInvoiceClick} />;
       case "job_board":
         return <JobBoard onJobClick={setSelectedJob} onGenerateInvoice={() => {}} />;
       case "tech_dashboard":
@@ -88,8 +95,8 @@ const Index = () => {
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-slate-900 text-slate-200">
-      <div className="p-4 border-b border-slate-800">
+    <div className="flex flex-col h-full bg-card text-card-foreground">
+      <div className="p-4 border-b border-border">
         <h1 className={`font-bold text-xl ${isSidebarCollapsed && !isMobile ? 'text-center' : ''}`}>
           {isSidebarCollapsed && !isMobile ? 'XD' : 'Xpress Diesel'}
         </h1>
@@ -99,7 +106,7 @@ const Index = () => {
           <Button
             key={item.id}
             variant={activeView === item.id ? "secondary" : "ghost"}
-            className={`w-full justify-start hover:bg-slate-800 ${isSidebarCollapsed && !isMobile ? 'justify-center' : ''}`}
+            className={`w-full justify-start hover:bg-accent ${isSidebarCollapsed && !isMobile ? 'justify-center' : ''}`}
             onClick={() => setActiveView(item.id)}
           >
             <item.icon className={`h-5 w-5 ${isSidebarCollapsed && !isMobile ? '' : 'mr-3'}`} />
@@ -107,8 +114,8 @@ const Index = () => {
           </Button>
         ))}
       </nav>
-      <div className="p-2 border-t border-slate-800">
-        <Button variant="ghost" className="w-full justify-start hover:bg-slate-800" onClick={handleLogout}>
+      <div className="p-2 border-t border-border">
+        <Button variant="ghost" className="w-full justify-start hover:bg-accent" onClick={handleLogout}>
           <LogOut className={`h-5 w-5 ${isSidebarCollapsed && !isMobile ? '' : 'mr-3'}`} />
           {!isSidebarCollapsed || isMobile ? 'Logout' : ''}
         </Button>
@@ -125,7 +132,7 @@ const Index = () => {
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64 bg-slate-900 border-r-slate-800">
+          <SheetContent side="left" className="p-0 w-64 bg-card border-r">
             <SidebarContent />
           </SheetContent>
         </Sheet>
@@ -134,11 +141,11 @@ const Index = () => {
         </main>
         <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
             <DialogTrigger asChild>
-                <Button className="fixed bottom-6 right-6 rounded-full h-14 w-14 bg-neon-blue hover:bg-blue-500 shadow-lg shadow-neon-blue/30">
+                <Button className="fixed bottom-6 right-6 rounded-full h-14 w-14 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30">
                     <Bot className="h-7 w-7" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="p-0 max-w-md h-[70vh] flex flex-col bg-slate-900 border-slate-800">
+            <DialogContent className="p-0 max-w-md h-[70vh] flex flex-col bg-card border-border">
                 <AIHelper />
             </DialogContent>
         </Dialog>
@@ -153,7 +160,7 @@ const Index = () => {
         <SidebarContent />
       </aside>
       <div className="relative flex-1 flex flex-col">
-        <header className="flex items-center justify-between p-4 border-b border-slate-800">
+        <header className="flex items-center justify-between p-4 border-b border-border">
           <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}>
             {isSidebarCollapsed ? <ChevronRight /> : <ChevronLeft />}
           </Button>
@@ -166,11 +173,11 @@ const Index = () => {
       </div>
       <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
           <DialogTrigger asChild>
-              <Button className="fixed bottom-6 right-6 rounded-full h-16 w-16 bg-neon-blue hover:bg-blue-500 shadow-lg shadow-neon-blue/30 z-50">
+              <Button className="fixed bottom-6 right-6 rounded-full h-16 w-16 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30 z-50">
                   <Bot className="h-8 w-8" />
               </Button>
           </DialogTrigger>
-          <DialogContent className="p-0 max-w-md h-[70vh] flex flex-col bg-slate-900 border-slate-800">
+          <DialogContent className="p-0 max-w-md h-[70vh] flex flex-col bg-card border-border">
               <AIHelper />
           </DialogContent>
       </Dialog>
