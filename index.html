@@ -29,5 +29,15 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <script>
+      // Electron context bridge setup
+      if (typeof require !== 'undefined') {
+        window.electronRequire = require;
+        window.isElectron = true;
+      } else {
+        window.isElectron = false;
+      }
+    </script>
   </body>
 </html>
