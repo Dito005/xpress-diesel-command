@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface TimeLog {
@@ -14,7 +14,7 @@ interface TimeLog {
   clock_in: string;
   clock_out: string | null;
   notes: string | null;
-  jobs?: { description: string } | null; // Joined job description
+  jobs?: { job_type: string; truck_vin: string | null } | null;
 }
 
 interface Technician {
@@ -42,7 +42,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
       .from('time_logs')
       .select(`
         *,
-        jobs(description)
+        jobs(job_type, truck_vin)
       `)
       .eq('tech_id', technician.id)
       .order('clock_in', { ascending: false });
@@ -58,7 +58,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
   const fetchJobs = async () => {
     const { data, error } = await supabase
       .from('jobs')
-      .select('id, description');
+      .select('id, job_type, truck_vin');
     if (error) {
       console.error("Error fetching jobs:", error);
     } else {
@@ -155,7 +155,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
                   >
                     <option value="">General Shift</option>
                     {jobs.map(job => (
-                      <option key={job.id} value={job.id}>{job.description}</option>
+                      <option key={job.id} value={job.id}>{job.job_type} ({job.truck_vin?.slice(-6) || 'N/A'})</option>
                     ))}
                   </select>
                 </div>
@@ -202,16 +202,16 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
             <TableBody>
               {timeLogs.map(log => (
                 <TableRow key={log.id}>
-                  <TableCell>{log.jobs?.description || 'General Shift'}</TableCell>
+                  <TableCell>{log.jobs ? `${log.jobs.job_type} (${log.jobs.truck_vin?.slice(-6) || 'N/A'})` : 'General Shift'}</TableCell>
                   <TableCell>
-                    <Input type="datetime-local" value={log.clock_in.substring(0, 16)} onChange={e => handleUpdateTime(log.id, 'clock_in', e.target.value)} />
+                    <Input type="datetime-local" defaultValue={log.clock_in ? new Date(log.clock_in).toISOString().substring(0, 16) : ''} onBlur={e => handleUpdateTime(log.id, 'clock_in', e.target.value)} />
                   </TableCell>
                   <TableCell>
-                    <Input type="datetime-local" value={log.clock_out?.substring(0, 16) || ''} onChange={e => handleUpdateTime(log.id, 'clock_out', e.target.value)} />
+                    <Input type="datetime-local" defaultValue={log.clock_out ? new Date(log.clock_out).toISOString().substring(0, 16) : ''} onBlur={e => handleUpdateTime(log.id, 'clock_out', e.target.value)} />
                   </TableCell>
                   <TableCell>{calculateDuration(log.clock_in, log.clock_out)}</TableCell>
                   <TableCell>
-                    <Input type="text" value={log.notes || ''} onChange={e => handleUpdateTime(log.id, 'notes', e.target.value)} />
+                    <Input type="text" defaultValue={log.notes || ''} onBlur={e => handleUpdateTime(log.id, 'notes', e.target.value)} />
                   </TableCell>
                   <TableCell>
                     <Button variant="destructive" size="sm" onClick={() => handleDeleteLog(log.id)}>

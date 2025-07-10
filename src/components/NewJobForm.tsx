@@ -16,38 +16,49 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 const fetchVehicleDataFromVIN = async (vin: string) => {
   const nhtsaApiUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`;
   
-  const response = await fetch(nhtsaApiUrl);
-  if (!response.ok) {
-    throw new Error('Network response was not ok.');
+  try {
+    const response = await fetch(nhtsaApiUrl);
+    if (!response.ok) {
+      throw new Error(`Network response was not ok: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+
+    if (!data.Results || data.Results.length === 0) {
+      throw new Error('No results found for this VIN.');
+    }
+
+    const getResultValue = (variableName: string) => {
+      const result = data.Results.find((r: any) => r.Variable === variableName);
+      return result && result.Value && result.Value !== "Not Applicable" ? result.Value : null;
+    };
+
+    const errorCode = getResultValue('Error Code');
+    
+    if (errorCode && errorCode !== '0') {
+      const errorMessage = getResultValue('Error Text') || 'Failed to decode VIN.';
+      if (errorMessage.includes('VIN not found')) {
+          throw new Error('VIN not found. Please check the VIN and try again.');
+      }
+      throw new Error(errorMessage);
+    }
+
+    const make = getResultValue('Make');
+    const model = getResultValue('Model');
+    const year = getResultValue('Model Year');
+
+    if (!make || !model || !year) {
+      throw new Error('Could not decode all vehicle details from VIN. Please enter manually.');
+    }
+
+    return { make, model, year };
+  } catch (error) {
+    console.error("VIN Lookup Error:", error);
+    if (error instanceof Error) {
+        throw new Error(`${error.message}`);
+    }
+    throw new Error('An unknown error occurred during VIN lookup.');
   }
-  
-  const data = await response.json();
-
-  if (!data.Results || data.Results.length === 0) {
-    throw new Error('No results found for this VIN.');
-  }
-
-  const getResultValue = (variableName: string) => {
-    const result = data.Results.find((r: any) => r.Variable === variableName);
-    return result ? result.Value : null;
-  };
-
-  const errorCode = getResultValue('Error Code');
-  
-  if (errorCode && errorCode !== '0' && errorCode !== '1') { // Error code '1' can mean partial results, which is often fine
-    const errorMessage = getResultValue('Error Text') || 'Failed to decode VIN.';
-    throw new Error(errorMessage);
-  }
-
-  const make = getResultValue('Make');
-  const model = getResultValue('Model');
-  const year = getResultValue('Model Year');
-
-  if (!make || !model || !year) {
-    throw new Error('Could not decode all vehicle details from VIN. Please enter manually.');
-  }
-
-  return { make, model, year };
 };
 
 // AI-powered suggestions for customer complaints based on job type
@@ -78,6 +89,7 @@ const formSchema = z.object({
   company: z.string().optional(),
   billingAddress: z.string().optional(),
   jobType: z.string().min(1, "Job type is required"),
+  priority: z.string().min(1, "Priority is required"),
   customerConcern: z.string().min(10, "Please provide a detailed customer concern"),
   recommendedService: z.string().optional(),
   notes: z.string().optional(),
@@ -118,6 +130,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
       company: "",
       billingAddress: "",
       jobType: "",
+      priority: "medium",
       customerConcern: "",
       recommendedService: "",
       notes: "",
@@ -275,6 +288,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
         company: values.company,
         billing_address: values.billingAddress,
         job_type: values.jobType,
+        priority: values.priority,
         notes: values.notes,
         customer_concern: values.customerConcern,
         recommended_service: values.recommendedService,
@@ -284,7 +298,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
           model: values.model,
           year: values.year,
           usdot_number: values.usdotNumber,
-          // Add other USDOT fields here if fetched and needed
         },
       }
     ]).select().single();
@@ -299,7 +312,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
       return;
     }
 
-    // If a technician is assigned (and not the "unassigned" placeholder), create a job_assignment entry
     if (values.assignedTechId && values.assignedTechId !== "unassigned" && jobData?.id) {
       const { error: assignmentError } = await supabase.from('job_assignments').insert([
         {
@@ -365,7 +377,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
                 <FormItem>
                   <FormLabel>Make</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Ford" {...field} />
+                    <Input placeholder="e.g., Freightliner" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -378,7 +390,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
                 <FormItem>
                   <FormLabel>Model</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., F-550" {...field} />
+                    <Input placeholder="e.g., Cascadia" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -391,7 +403,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
                 <FormItem>
                   <FormLabel>Year</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 2016" {...field} />
+                    <Input placeholder="e.g., 2021" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -405,14 +417,14 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
           {existingCustomers.length > 0 && (
             <FormField
               control={form.control}
-              name="customerName" // Using customerName field to trigger selection
+              name="customerName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Select Existing Customer (Optional)</FormLabel> {/* Removed htmlFor as it's handled by FormControl */}
+                  <FormLabel>Select Existing Customer (Optional)</FormLabel>
                   <FormControl>
-                    <Select onValueChange={handleCustomerSelect} value={field.value}> {/* Added value prop */}
-                      <SelectTrigger id="customerSelect"> {/* Ensure this ID is unique if needed */}
-                        <SelectValue placeholder="Select a customer" />
+                    <Select onValueChange={handleCustomerSelect} value={field.value}>
+                      <SelectTrigger id="customerSelect">
+                        <SelectValue placeholder="Select a customer to auto-fill" />
                       </SelectTrigger>
                       <SelectContent>
                         {existingCustomers.map((customer, index) => (
@@ -423,7 +435,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
                       </SelectContent>
                     </Select>
                   </FormControl>
-                  <FormDescription>Choose a customer to auto-fill their details.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -436,7 +447,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Name</FormLabel>
-                  <FormDescription>Individual or primary contact name.</FormDescription>
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
                   </FormControl>
@@ -450,7 +460,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Phone</FormLabel>
-                  <FormDescription>Primary contact phone number.</FormDescription>
                   <FormControl>
                     <Input placeholder="(555) 123-4567" {...field} />
                   </FormControl>
@@ -464,7 +473,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Email (Optional)</FormLabel>
-                  <FormDescription>Email for invoices and updates.</FormDescription>
                   <FormControl>
                     <Input placeholder="john.doe@example.com" {...field} />
                   </FormControl>
@@ -478,7 +486,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>USDOT Number (Optional)</FormLabel>
-                  <FormDescription>Enter company's USDOT number to auto-fill company info.</FormDescription>
                   <div className="flex gap-2">
                     <FormControl>
                       <Input placeholder="e.g., 1234567" {...field} />
@@ -497,7 +504,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Company Name (Optional)</FormLabel>
-                  <FormDescription>Auto-filled from USDOT or manually entered.</FormDescription>
                   <FormControl>
                     <Input placeholder="Acme Trucking Inc." {...field} />
                   </FormControl>
@@ -511,7 +517,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
                   <FormLabel>Billing Address (Optional)</FormLabel>
-                  <FormDescription>The official billing address for the company.</FormDescription>
                   <FormControl>
                     <Textarea placeholder="123 Business Rd, Suite 100, Commerce City, USA" {...field} />
                   </FormControl>
@@ -524,42 +529,65 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
 
         <div className="space-y-4 p-4 border rounded-lg">
           <h3 className="font-semibold text-lg">Job Details & Assignment</h3>
-          <FormField
-            control={form.control}
-            name="jobType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Job Type</FormLabel>
-                <FormDescription>Select the primary type of service required.</FormDescription>
-                <Select onValueChange={handleJobTypeChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select job type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="PM Service">PM Service</SelectItem>
-                    <SelectItem value="Brake Repair">Brake Repair</SelectItem>
-                    <SelectItem value="Engine Work">Engine Work</SelectItem>
-                    <SelectItem value="AC Repair">AC Repair</SelectItem>
-                    <SelectItem value="Transmission">Transmission</SelectItem>
-                    <SelectItem value="Electrical">Electrical</SelectItem>
-                    <SelectItem value="Road Service">Road Service</SelectItem>
-                    <SelectItem value="Diagnostic">Diagnostic</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="jobType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Job Type</FormLabel>
+                  <Select onValueChange={handleJobTypeChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select job type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="PM Service">PM Service</SelectItem>
+                      <SelectItem value="Brake Repair">Brake Repair</SelectItem>
+                      <SelectItem value="Engine Work">Engine Work</SelectItem>
+                      <SelectItem value="AC Repair">AC Repair</SelectItem>
+                      <SelectItem value="Transmission">Transmission</SelectItem>
+                      <SelectItem value="Electrical">Electrical</SelectItem>
+                      <SelectItem value="Road Service">Road Service</SelectItem>
+                      <SelectItem value="Diagnostic">Diagnostic</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="priority"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Priority</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select job priority" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           <FormField
             control={form.control}
             name="customerConcern"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Customer Complaint</FormLabel>
-                <FormDescription>Detailed description of the issue reported by the customer.</FormDescription>
                 <FormControl>
                   <Textarea placeholder="Describe the customer's issue..." {...field} />
                 </FormControl>
@@ -573,7 +601,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Recommended Service (Optional)</FormLabel>
-                <FormDescription>Any additional services recommended during initial assessment.</FormDescription>
                 <FormControl>
                   <Textarea placeholder="Any recommended services..." {...field} />
                 </FormControl>
@@ -587,7 +614,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Internal Notes (Optional)</FormLabel>
-                <FormDescription>Any internal notes for the job, not visible to the customer.</FormDescription>
                 <FormControl>
                   <Textarea placeholder="Any internal notes for the job..." {...field} />
                 </FormControl>
@@ -601,7 +627,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Assign Technician (Optional)</FormLabel>
-                <FormDescription>Assign a technician to this job immediately.</FormDescription>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
