@@ -13,10 +13,10 @@ import { electronAPI } from "@/lib/electron";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { session, isLoading, userRole } = useSession(); // Get userRole here
+  const { session, isLoading, userRole } = useSession(); // We still need session and isLoading here
 
-  // Wait until both isLoading is false AND userRole is not null
-  if (isLoading || userRole === null) {
+  // If still loading session data, show skeleton
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <LoadingSkeleton />
@@ -24,10 +24,15 @@ const AppRoutes = () => {
     );
   }
 
+  // If not loading and no session, redirect to login
+  if (!session) {
+    return <Navigate to="/login" />;
+  }
+
+  // If session exists and not loading, render the main app (Index)
   return (
     <Routes>
-      <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-      <Route path="/*" element={session ? <Index /> : <Navigate to="/login" />} />
+      <Route path="/*" element={<Index />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
