@@ -1,4 +1,13 @@
-// This provides a safe way to use Electron's ipcRenderer in both web and Electron environments
+// Add type declaration for window.electronAPI
+declare global {
+  interface Window {
+    electronAPI?: {
+      send: (channel: string, ...args: any[]) => void;
+      on: (channel: string, listener: (...args: any[]) => void) => void;
+      removeListener: (channel: string, listener: (...args: any[]) => void) => void;
+    };
+  }
+}
 
 type IpcRenderer = {
   send: (channel: string, ...args: any[]) => void;
@@ -6,37 +15,33 @@ type IpcRenderer = {
   removeListener: (channel: string, listener: (...args: any[]) => void) => void;
 };
 
-let ipcRenderer: IpcRenderer | undefined;
+const safeIpc: IpcRenderer = {
+  send: () => {},
+  on: () => {},
+  removeListener: () => {}
+};
 
-// Try to get ipcRenderer if in Electron environment
-if (typeof window !== 'undefined' && window.require) {
+const getIpcRenderer = () => {
+  if (typeof window === 'undefined') return null;
+  
   try {
-    ipcRenderer = window.require('electron').ipcRenderer;
+    if (window.require) {
+      return window.require('electron').ipcRenderer;
+    }
+    if (window.electronAPI) {  // Now properly typed
+      return window.electronAPI;
+    }
   } catch (e) {
     console.warn('Electron ipcRenderer not available');
   }
-}
+  return null;
+};
 
-// Safe wrapper functions
+const ipcRenderer = getIpcRenderer() || safeIpc;
+
 export const electronAPI = {
-  send: (channel: string, ...args: any[]) => {
-    if (ipcRenderer) {
-      ipcRenderer.send(channel, ...args);
-    } else {
-      console.log(`[Web Fallback] IPC send: ${channel}`, args);
-    }
-  },
-  on: (channel: string, listener: (...args: any[]) => void) => {
-    if (ipcRenderer) {
-      ipcRenderer.on(channel, listener);
-    } else {
-      console.log(`[Web Fallback] IPC on: ${channel}`);
-    }
-  },
-  removeListener: (channel: string, listener: (...args: any[]) => void) => {
-    if (ipcRenderer) {
-      ipcRenderer.removeListener(channel, listener);
-    }
-  },
-  isElectron: () => !!ipcRenderer
+  send: ipcRenderer.send.bind(ipcRenderer),
+  on: ipcRenderer.on.bind(ipcRenderer),
+  removeListener: ipcRenderer.removeListener.bind(ipcRenderer),
+  isElectron: () => !!getIpcRenderer()
 };
