@@ -176,15 +176,15 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-black/30 backdrop-blur-sm border-b border-primary/20 sticky top-0 z-40">
+      <header className="bg-card border-b sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="text-center">
-              <h1 className="text-xl font-bold text-primary glow-hover cursor-pointer">Xpress Diesel Neo</h1>
+              <h1 className="text-xl font-bold text-primary cursor-pointer">Xpress Diesel Repair</h1>
             </div>
             <div className="flex items-center space-x-4">
               {userRole && (
-                <Badge variant="outline" className="border-secondary text-secondary flex items-center gap-2">
+                <Badge variant="outline" className="border-secondary text-secondary-foreground flex items-center gap-2">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
@@ -194,11 +194,11 @@ const Index = () => {
               )}
               <Dialog open={isAiHelperOpen} onOpenChange={setIsAiHelperOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="icon" className="glow-hover">
+                  <Button variant="outline" size="icon">
                     <Bot className="h-5 w-5 text-primary" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 bg-card/80 border-primary/30">
+                <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0">
                   <Suspense fallback={<div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                     <AIHelper />
                   </Suspense>
@@ -216,20 +216,20 @@ const Index = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {(userRole === "admin" || userRole === "manager" || userRole === "unassigned") && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-yellow-100 flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Pending Jobs</CardTitle></CardHeader>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Pending Jobs</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-bold">{kpiData.pendingJobs}</div></CardContent>
             </Card>
-            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-blue-100 flex items-center gap-2"><Wrench className="h-4 w-4" /> Active Jobs</CardTitle></CardHeader>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Wrench className="h-4 w-4" /> Active Jobs</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-bold">{kpiData.activeJobs}</div></CardContent>
             </Card>
-            <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-100 flex items-center gap-2"><DollarSign className="h-4 w-4" /> Today's Profit</CardTitle></CardHeader>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4" /> Today's Profit</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-bold">${kpiData.todaysProfit.toFixed(2)}</div></CardContent>
             </Card>
-            <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-purple-100 flex items-center gap-2"><BarChart className="h-4 w-4" /> Live Metrics</CardTitle></CardHeader>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><BarChart className="h-4 w-4" /> Live Metrics</CardTitle></CardHeader>
               <CardContent><div className="text-lg font-bold">{kpiData.activeJobs} Active Jobs</div></CardContent>
             </Card>
           </div>
@@ -237,9 +237,9 @@ const Index = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="overflow-x-auto">
-            <TabsList className="bg-black/30 border border-primary/20 p-1 rounded-lg">
+            <TabsList>
               {visibleTabs.map(tab => (
-                <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2 data-[state=active]:bg-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/50">
+                <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
                   <tab.icon className="h-4 w-4" /> {tab.label}
                 </TabsTrigger>
               ))}

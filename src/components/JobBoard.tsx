@@ -50,7 +50,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
       case "open": return "border-gray-500";
       case "in_progress": return "border-primary animate-pulse";
       case "waiting_parts": return "border-yellow-500";
-      case "completed": return "border-accent";
+      case "completed": return "border-green-500";
       default: return "border-gray-500";
     }
   };
@@ -72,12 +72,12 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
         <h2 className="text-2xl font-bold text-foreground">Live Job Board</h2>
         <Dialog open={isNewJobModalOpen} onOpenChange={setIsNewJobModalOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 glow-hover" onClick={() => setIsNewJobModalOpen(true)}>
+            <Button onClick={() => setIsNewJobModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Job
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl bg-card/80 border-primary/30">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Create New Job</DialogTitle>
             </DialogHeader>
@@ -92,7 +92,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
               <h3 className="font-semibold text-foreground capitalize">
                 {getStatusText(status)}
               </h3>
-              <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+              <Badge variant="outline">
                 {statusJobs.length}
               </Badge>
             </div>
@@ -101,15 +101,15 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
               {statusJobs.map((job) => (
                 <Card 
                   key={job.id}
-                  className={`cursor-pointer bg-card/80 hover:bg-primary/10 transition-all border-l-4 ${getStatusColor(job.status)}`}
+                  className={`cursor-pointer hover:bg-accent transition-all border-l-4 ${getStatusColor(job.status)}`}
                   onClick={() => onJobClick(job)}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2 font-orbitron">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
                         {job.truck_vin.slice(-6)}
                       </CardTitle>
-                      <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                      <Badge variant="outline" className="text-xs">
                         {getStatusText(job.status)}
                       </Badge>
                     </div>
