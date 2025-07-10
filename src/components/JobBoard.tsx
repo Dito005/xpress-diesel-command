@@ -82,7 +82,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
               New Job
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl bg-background/95 backdrop-blur-sm">
             <DialogHeader>
               <DialogTitle>Create New Job</DialogTitle>
             </DialogHeader>

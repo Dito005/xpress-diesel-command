@@ -61,6 +61,15 @@ const fetchInvoicingData = async () => {
   return { invoices: invoices || [], jobs: jobs || [], parts: parts || [], techs: techs || [], invoiceSettings };
 };
 
+const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return { bg: 'bg-green-100 dark:bg-green-900/50', text: 'text-green-600 dark:text-green-400' };
+      case 'sent': return { bg: 'bg-blue-100 dark:bg-blue-900/50', text: 'text-blue-600 dark:text-blue-400' };
+      case 'pending': return { bg: 'bg-yellow-100 dark:bg-yellow-900/50', text: 'text-yellow-600 dark:text-yellow-400' };
+      default: return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400' };
+    }
+};
+
 interface InvoicingSystemProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
@@ -211,16 +220,38 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
       <Card>
         <CardHeader><CardTitle>All Invoices</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : filteredInvoices.map((invoice) => (
-            <div key={invoice.id} className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800" onClick={() => onOpenEditor(invoice)}>
-              <div>
-                <h3 className="font-semibold text-foreground">Invoice #{invoice.id?.slice(0, 8)}</h3>
-                <p className="text-sm text-muted-foreground">{invoice.jobs?.customer_name || 'N/A'}</p>
-                <Badge>{invoice.status}</Badge>
-              </div>
-              <div className="text-right"><p className="text-xl font-bold text-foreground">${invoice.grand_total?.toLocaleString()}</p></div>
-            </div>
-          ))}
+          {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : filteredInvoices.map((invoice) => {
+            const statusStyle = getStatusColor(invoice.status);
+            return (
+              <Card key={invoice.id} className="bg-card/80 backdrop-blur-sm hover:bg-accent/80 transition-colors cursor-pointer" onClick={() => onOpenEditor(invoice)}>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-full ${statusStyle.bg}`}>
+                      <FileText className={`h-6 w-6 ${statusStyle.text}`} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        Invoice #{invoice.id?.slice(0, 8)}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {invoice.jobs?.customer_name || 'N/A'} • VIN: {invoice.jobs?.truck_vin?.slice(-6) || 'N/A'}
+                      </p>
+                      <Badge variant="outline" className="mt-1 capitalize">{invoice.status}</Badge>
+                    </div>
+                  </div>
+                  <div className="text-right flex items-center gap-4">
+                    <div>
+                      <p className="text-xl font-bold text-foreground">${invoice.grand_total?.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(invoice.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onOpenEditor(invoice); }}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </CardContent>
       </Card>
       

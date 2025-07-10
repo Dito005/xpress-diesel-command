@@ -120,7 +120,7 @@ export const TechnicianManagement = () => {
               Add Technician
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-sm">
             <DialogHeader>
               <DialogTitle>Add New Technician</DialogTitle>
             </DialogHeader>
@@ -146,7 +146,7 @@ export const TechnicianManagement = () => {
         <CardContent>
           <div className="space-y-4">
             {technicians.map((tech) => (
-              <div key={tech.id} className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800/60 rounded-lg">
+              <div key={tech.id} className="flex items-center justify-between p-4 bg-card/80 backdrop-blur-sm rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-semibold">{tech.name}</h3>
@@ -180,7 +180,7 @@ export const TechnicianManagement = () => {
                         <Edit className="h-3 w-3" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-sm">
                       <DialogHeader><DialogTitle>Edit Technician</DialogTitle></DialogHeader>
                       {selectedTech && (
                         <TechnicianForm
