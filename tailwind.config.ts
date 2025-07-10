@@ -59,6 +59,8 @@ export default {
 			},
       boxShadow: {
         'glow-orange': '0 0 15px 0px hsl(24.6, 95%, 53.1%, 0.6)',
+        'glow-blue': '0 0 15px 0px hsla(217, 91%, 60%, 0.6)',
+        'glow-green': '0 0 15px 0px hsla(142, 71%, 45%, 0.6)',
       },
 			borderRadius: {
 				lg: 'var(--radius)',

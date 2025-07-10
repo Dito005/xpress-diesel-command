@@ -1,37 +1,27 @@
 import { useState } from "react";
-import { NavLink, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   LayoutDashboard,
-  Users,
-  Wrench,
-  FileText,
   BarChart2,
   Settings,
-  Bot,
   LogOut,
   Menu,
 } from "lucide-react";
 import { useSession, type UserRole } from "@/components/SessionProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { AIHelper } from "@/components/AIHelper";
-import { JobBoard } from "@/components/JobBoard";
-import { TechnicianManagement } from "@/components/TechnicianManagement";
-import { ReportsAnalytics } from "@/components/ReportsAnalytics";
-import { InvoicingSystem } from "@/components/InvoicingSystem";
-import { ShopSettings } from "@/components/ShopSettings";
-import { TechnicianDashboard } from "@/components/TechnicianDashboard";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { FloatingAIHelper } from "@/components/FloatingAIHelper";
+import { DashboardPage } from "./DashboardPage";
+import { ReportsAnalytics } from "@/components/ReportsAnalytics";
+import { ShopSettings } from "@/components/ShopSettings";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "tech", "road", "parts", "unassigned"] },
-  { href: "/jobs", label: "Job Board", icon: Wrench, roles: ["admin", "manager"] },
-  { href: "/technicians", label: "Technicians", icon: Users, roles: ["admin", "manager"] },
-  { href: "/invoicing", label: "Invoicing", icon: FileText, roles: ["admin", "manager"] },
   { href: "/reports", label: "Reports", icon: BarChart2, roles: ["admin", "manager"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
 ];
@@ -91,22 +81,9 @@ const Sidebar = ({ userRole, onLinkClick }: SidebarProps) => {
   );
 };
 
-interface DashboardContentProps {
-  onJobClick: (job: any) => void;
-  userRole: UserRole;
-}
-
-const DashboardContent = ({ onJobClick, userRole }: DashboardContentProps) => {
-  if (userRole === 'tech' || userRole === 'road') {
-    return <TechnicianDashboard userRole={userRole} onJobClick={onJobClick} />;
-  }
-  return <JobBoard onJobClick={onJobClick} onGenerateInvoice={() => {}} />;
-};
-
 const Index = () => {
   const { userRole } = useSession();
   const location = useLocation();
-  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false);
@@ -134,7 +111,35 @@ const Index = () => {
     const currentPath = location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`;
     const item = navItems.find(nav => nav.href === currentPath);
     return item ? item.label : "Dashboard";
-  }
+  };
+
+  const renderContent = () => {
+    const currentPath = location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`;
+    switch (currentPath) {
+      case '/':
+        return <DashboardPage 
+                  onJobClick={handleJobClick} 
+                  onGenerateInvoice={handleGenerateInvoice}
+                  onOpenInvoiceEditor={handleOpenInvoiceEditor}
+                  isInvoiceEditorOpen={isInvoiceEditorOpen}
+                  setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
+                  editingInvoice={editingInvoice}
+                />;
+      case '/reports':
+        return <ReportsAnalytics />;
+      case '/settings':
+        return <ShopSettings />;
+      default:
+        return <DashboardPage 
+                  onJobClick={handleJobClick} 
+                  onGenerateInvoice={handleGenerateInvoice}
+                  onOpenInvoiceEditor={handleOpenInvoiceEditor}
+                  isInvoiceEditorOpen={isInvoiceEditorOpen}
+                  setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
+                  editingInvoice={editingInvoice}
+                />;
+    }
+  };
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -155,30 +160,12 @@ const Index = () => {
             </SheetContent>
           </Sheet>
           <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
-          <div className="w-full flex-1">
-            {/* Can add a search bar here */}
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}>
-            <Bot className="h-5 w-5" />
-            <span className="sr-only">Toggle AI Assistant</span>
-          </Button>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          <Routes>
-            <Route path="/" element={<DashboardContent onJobClick={handleJobClick} userRole={userRole} />} />
-            <Route path="/jobs" element={<JobBoard onJobClick={handleJobClick} onGenerateInvoice={handleGenerateInvoice} />} />
-            <Route path="/technicians" element={<TechnicianManagement />} />
-            <Route path="/invoicing" element={<InvoicingSystem isOpen={isInvoiceEditorOpen} setIsOpen={setIsInvoiceEditorOpen} editingInvoice={editingInvoice} onSuccess={() => setIsInvoiceEditorOpen(false)} onOpenEditor={handleOpenInvoiceEditor} />} />
-            <Route path="/reports" element={<ReportsAnalytics />} />
-            <Route path="/settings" element={<ShopSettings />} />
-          </Routes>
+          {renderContent()}
         </main>
       </div>
-      <Sheet open={isAiPanelOpen} onOpenChange={setIsAiPanelOpen}>
-        <SheetContent className="w-[400px] sm:w-[540px] p-0 flex flex-col">
-          <AIHelper />
-        </SheetContent>
-      </Sheet>
+      <FloatingAIHelper />
       {selectedJob && (
         <JobDetailsModal
           job={selectedJob}

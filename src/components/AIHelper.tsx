@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from 'uuid';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bot, Send, Loader2, User } from "lucide-react";
@@ -140,50 +139,43 @@ export const AIHelper = () => {
 
   return (
     <>
-      <Card className="h-full flex flex-col border-0 shadow-none rounded-none">
-        <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="h-6 w-6 text-blue-600" /> AI Assistant
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex items-end gap-2 ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-              {message.type === 'ai' && <Bot className="h-6 w-6 text-gray-500 flex-shrink-0" />}
-              <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.type === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}`}>
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                {message.action && !isLoading && (
-                  <Button size="sm" className="mt-2" onClick={() => setActionToConfirm(message.action!)}>
-                    Confirm Action
-                  </Button>
-                )}
-              </div>
-              {message.type === 'user' && <User className="h-6 w-6 text-gray-500 flex-shrink-0" />}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div key={message.id} className={`flex items-end gap-2 ${message.type === "user" ? "justify-end" : "justify-start"}`}>
+            {message.type === 'ai' && <Bot className="h-6 w-6 text-gray-500 flex-shrink-0" />}
+            <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.type === "user" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              {message.action && !isLoading && (
+                <Button size="sm" className="mt-2" onClick={() => setActionToConfirm(message.action!)}>
+                  Confirm Action
+                </Button>
+              )}
             </div>
-          ))}
-          {isLoading && !actionToConfirm && (
-            <div className="flex justify-start items-center gap-2">
-               <Bot className="h-6 w-6 text-gray-500 flex-shrink-0" />
-               <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </CardContent>
-        <div className="p-4 border-t bg-white">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Ask me to create a job, check a status..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-              disabled={isLoading}
-            />
-            <Button onClick={handleSendMessage} disabled={!inputMessage.trim() || isLoading}>
-              <Send className="h-4 w-4" />
-            </Button>
+            {message.type === 'user' && <User className="h-6 w-6 text-gray-500 flex-shrink-0" />}
           </div>
+        ))}
+        {isLoading && !actionToConfirm && (
+          <div className="flex justify-start items-center gap-2">
+             <Bot className="h-6 w-6 text-gray-500 flex-shrink-0" />
+             <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      <div className="p-4 border-t bg-background">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Ask me to create a job, check a status..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+            disabled={isLoading}
+          />
+          <Button onClick={handleSendMessage} disabled={!inputMessage.trim() || isLoading}>
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
-      </Card>
+      </div>
 
       <AlertDialog open={!!actionToConfirm} onOpenChange={() => setActionToConfirm(null)}>
         <AlertDialogContent>

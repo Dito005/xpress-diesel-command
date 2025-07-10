@@ -23,11 +23,11 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 24.6 95% 53.1%; /* Orange */
-    --radius: 0.5rem;
+    --radius: 1rem; /* Increased for more rounded corners */
   }
 
   .dark {
-    --background: 224 71.4% 4.1%; /* Almost black */
+    --background: 0 0% 5%; /* Jet Black #0d0d0d */
     --foreground: 210 20% 98%; /* White */
     --card: 222.2 47.4% 11.2%; /* Deep Navy */
     --card-foreground: 210 20% 98%;
