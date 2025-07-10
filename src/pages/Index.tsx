@@ -24,11 +24,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/components/SessionProvider";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { PendingPayments } from "@/components/PendingPayments";
 
 type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
 
-// Type guard function to check if a string is a valid UserRole
 function isUserRole(role: string | null): role is UserRole {
   if (role === null) return false;
   const validRoles: UserRole[] = ["admin", "manager", "tech", "road", "parts", "unassigned"];
@@ -37,7 +35,8 @@ function isUserRole(role: string | null): role is UserRole {
 
 const Index = () => {
   const [selectedJob, setSelectedJob] = useState(null);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
   const [activeTab, setActiveTab] = useState("jobs");
   const { userRole, session } = useSession();
   const [liveLaborCost, setLiveLaborCost] = useState(0);
@@ -111,27 +110,47 @@ const Index = () => {
     setSelectedJob(job);
   };
 
-  const handleInvoiceClick = (invoiceId) => {
-    // This will open the invoice in the invoicing system tab
+  const handleOpenInvoiceEditor = (invoice = null) => {
+    setEditingInvoice(invoice);
+    setIsInvoiceModalOpen(true);
+  };
+
+  const handleGenerateInvoiceFromJob = async (job) => {
+    if (!job) return;
+
+    const { data: newInvoice, error } = await supabase
+      .from('invoices')
+      .insert({
+        job_id: job.id,
+        customer_name: job.customer_name,
+        customer_email: job.customer_email,
+        status: 'pending',
+        customer_concern: job.customer_concern,
+        recommended_service: job.recommended_service,
+        actual_service: job.actual_service || '',
+        grand_total: 0,
+      })
+      .select('*, jobs(*), invoice_parts(*, parts(*)), invoice_labor(*, techs(*)), payments(*)')
+      .single();
+
+    if (error) {
+      toast({ variant: "destructive", title: "Failed to create draft invoice", description: error.message });
+      return;
+    }
+
+    setSelectedJob(null);
     setActiveTab("invoicing");
-    // A more advanced implementation could have the invoicing system listen for this ID
-    // and open the edit modal automatically. For now, it just switches tabs.
-    console.log("Opening invoice:", invoiceId);
+    handleOpenInvoiceEditor(newInvoice);
+    
+    toast({ title: "Draft Invoice Created", description: "Now editing the new invoice." });
   };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      toast({
-        variant: "destructive",
-        title: "Logout Failed",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Logout Failed", description: error.message });
     } else {
-      toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out.",
-      });
+      toast({ title: "Logged Out", description: "You have been successfully logged out." });
       navigate('/login');
     }
   };
@@ -238,11 +257,11 @@ const Index = () => {
           </div>
 
           <TabsContent value="ai-analyzer"><Tabs defaultValue="analyzer" className="space-y-4"><TabsList><TabsTrigger value="analyzer">AI Job Analyzer</TabsTrigger><TabsTrigger value="workflow">Workflow Orchestrator</TabsTrigger></TabsList><TabsContent value="analyzer"><AIJobAnalyzer /></TabsContent><TabsContent value="workflow"><WorkflowOrchestrator /></TabsContent></Tabs></TabsContent>
-          <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} onInvoiceClick={handleInvoiceClick} /></TabsContent>
+          <TabsContent value="jobs"><JobBoard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="technician">{userRole === "tech" ? <TechnicianDashboard userRole={userRole} onJobClick={handleJobClick} /> : <TechnicianList />}</TabsContent>
           <TabsContent value="parts"><PartsRunnerDashboard onJobClick={handleJobClick} /></TabsContent>
           <TabsContent value="road"><RoadServiceDashboard onJobClick={handleJobClick} /></TabsContent>
-          <TabsContent value="invoicing"><InvoicingSystem /></TabsContent>
+          <TabsContent value="invoicing"><InvoicingSystem onOpenEditor={handleOpenInvoiceEditor} /></TabsContent>
           <TabsContent value="reports"><ReportsAnalytics /></TabsContent>
           <TabsContent value="parts-lookup"><PartsLookupTool /></TabsContent>
           <TabsContent value="costs"><BusinessCosts /></TabsContent>
@@ -250,7 +269,22 @@ const Index = () => {
         </Tabs>
       </main>
 
-      {selectedJob && <JobDetailsModal job={selectedJob} onClose={() => setSelectedJob(null)} userRole={userRole} />}
+      <JobDetailsModal 
+        job={selectedJob} 
+        onClose={() => setSelectedJob(null)} 
+        userRole={userRole}
+        onGenerateInvoice={handleGenerateInvoiceFromJob}
+      />
+
+      <InvoicingSystem 
+        isOpen={isInvoiceModalOpen}
+        setIsOpen={setIsInvoiceModalOpen}
+        editingInvoice={editingInvoice}
+        onSuccess={() => {
+          setIsInvoiceModalOpen(false);
+          setEditingInvoice(null);
+        }}
+      />
     </div>
   );
 };

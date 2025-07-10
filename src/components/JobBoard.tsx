@@ -3,12 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Clock, DollarSign, User, AlertTriangle, Plus } from "lucide-react";
+import { User, Plus } from "lucide-react";
 import { NewJobForm } from "./NewJobForm";
-import { supabase } from "@/integrations/supabase/client"; // Changed import path
-import { PendingPayments } from "./PendingPayments";
+import { supabase } from "@/integrations/supabase/client";
 
-export const JobBoard = ({ onJobClick, onInvoiceClick }) => {
+export const JobBoard = ({ onJobClick }) => {
   const [jobs, setJobs] = useState([]);
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
 
@@ -24,7 +23,6 @@ export const JobBoard = ({ onJobClick, onInvoiceClick }) => {
       if (error) {
         console.error("Error fetching jobs:", error);
       } else {
-        // Flatten the job_assignments array to get assigned tech names
         const jobsWithAssignedTechs = data.map(job => ({
           ...job,
           assigned_tech_names: job.job_assignments.map(assignment => assignment.techs?.name).filter(Boolean).join(', ')
@@ -38,7 +36,7 @@ export const JobBoard = ({ onJobClick, onInvoiceClick }) => {
     const channel = supabase
       .channel('realtime jobs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, fetchJobs)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, fetchJobs) // Listen to assignment changes
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, fetchJobs)
       .subscribe();
 
     return () => {
@@ -133,9 +131,6 @@ export const JobBoard = ({ onJobClick, onInvoiceClick }) => {
             </div>
           </div>
         ))}
-      </div>
-      <div className="mt-8">
-        <PendingPayments onInvoiceClick={onInvoiceClick} />
       </div>
     </div>
   );

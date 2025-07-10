@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/components/SessionProvider";
 
-export const JobDetailsModal = ({ job, onClose, userRole }) => {
+export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) => {
   const { toast } = useToast();
   const [notes, setNotes] = useState(job?.notes || "");
   const [actualService, setActualService] = useState(job?.actual_service || "");
@@ -39,7 +39,6 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
           setCurrentJobTimeLog(log);
         }
 
-        // Fetch assigned technicians for this job
         const { data: assignments, error: assignError } = await supabase
           .from('job_assignments')
           .select('techs(name)')
@@ -48,10 +47,8 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         if (assignError) {
           console.error("Error fetching job assignments:", assignError);
         } else {
-          // Safely access the name from the nested 'techs' relation.
-          // The 'techs' property here is an array of tech objects, even if typically only one.
           const names = assignments.map((assign: { techs: Array<{ name: string | null }> | null }) => 
-            assign.techs?.[0]?.name // Access the name from the first (and usually only) tech in the array
+            assign.techs?.[0]?.name
           ).filter(Boolean).join(', ');
           setAssignedTechNames(names);
         }
@@ -86,7 +83,6 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
     }
 
     if (currentJobTimeLog) {
-      // Clock out
       const { error } = await supabase
         .from('time_logs')
         .update({ clock_out: new Date().toISOString() })
@@ -97,10 +93,8 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
       } else {
         toast({ title: "Job Clocked Out", description: "You have clocked out of this job." });
         setCurrentJobTimeLog(null);
-        // Optionally update job status to 'paused' or similar
       }
     } else {
-      // Clock in
       const { error } = await supabase
         .from('time_logs')
         .insert({ tech_id: currentTechId, job_id: job.id, clock_in: new Date().toISOString(), type: 'job' });
@@ -109,7 +103,6 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
         toast({ variant: "destructive", title: "Error", description: "Failed to clock in to job." });
       } else {
         toast({ title: "Job Clocked In", description: "You have clocked in to this job." });
-        // Re-fetch to get the new log entry
         const { data: newLog } = await supabase
           .from('time_logs')
           .select('*')
@@ -118,61 +111,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
           .is('clock_out', null)
           .single();
         setCurrentJobTimeLog(newLog);
-        // Optionally update job status to 'in_progress'
       }
-    }
-  };
-
-  const handleGenerateInvoice = async () => {
-    if (!job?.id || !job.customer_name || !job.job_type) {
-      toast({ variant: "destructive", title: "Missing Job Details", description: "Cannot generate invoice without complete job info." });
-      return;
-    }
-
-    // Simulate calculating total amount based on job details
-    // In a real scenario, this would involve fetching actual labor logs and parts used for this job
-    // For now, we'll use a placeholder or simple calculation.
-    const estimatedAmount = (job.estimated_hours || 0) * 85 + (job.parts_cost || 0) + 200; // Example calculation with a base fee
-
-    // Check if an invoice already exists for this job
-    const { data: existingInvoice, error: existingInvoiceError } = await supabase
-      .from('invoices')
-      .select('id')
-      .eq('job_id', job.id)
-      .single();
-
-    if (existingInvoiceError && existingInvoiceError.code !== 'PGRST116') { // PGRST116 means no rows found
-      toast({ variant: "destructive", title: "Error checking existing invoice", description: existingInvoiceError.message });
-      return;
-    }
-
-    if (existingInvoice) {
-      toast({ title: "Invoice Already Exists", description: `An invoice for Job ${job.truck_vin?.slice(-6) || 'N/A'} already exists.` });
-      return;
-    }
-
-    const { error } = await supabase.from('invoices').insert([
-      {
-        job_id: job.id,
-        total: estimatedAmount,
-        status: 'pending',
-        customer_name: job.customer_name,
-        customer_email: job.customer_email,
-        // Populate customer_info from job.customer_info if available
-        customer_info: job.customer_info || {},
-        customer_concern: job.customer_concern,
-        recommended_service: job.recommended_service,
-        actual_service: actualService, // Use the actual service from the modal state
-      }
-    ]);
-
-    if (error) {
-      toast({ variant: "destructive", title: "Invoice Generation Failed", description: error.message });
-    } else {
-      toast({ title: "Invoice Generated", description: `Invoice for Job ${job.truck_vin?.slice(-6) || 'N/A'} created.` });
-      // Optionally update job status to 'invoiced' or 'completed'
-      await supabase.from('jobs').update({ status: 'completed' }).eq('id', job.id);
-      onClose(); // Close modal after generating invoice
     }
   };
 
@@ -192,7 +131,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
       toast({ variant: "destructive", title: "Error saving changes", description: error.message });
     } else {
       toast({ title: "Changes Saved", description: "Job details updated successfully." });
-      onClose(); // Close modal after saving
+      onClose();
     }
   };
 
@@ -400,7 +339,7 @@ export const JobDetailsModal = ({ job, onClose, userRole }) => {
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           {(userRole === "admin" || userRole === "manager") && (
-            <Button variant="outline" onClick={handleGenerateInvoice}>
+            <Button variant="outline" onClick={() => onGenerateInvoice(job)}>
               Generate Invoice
             </Button>
           )}
