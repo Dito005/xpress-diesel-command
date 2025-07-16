@@ -179,7 +179,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }: J
           <DialogTitle className="flex items-center gap-3">
             <Truck className="h-6 w-6 text-primary" />
             Job Details - {job.truck_vin?.slice(-6) || 'N/A'}
-            <Badge className={getStatusColor(job.status)} variant="outline">
+            <Badge className={getStatusColor(job.status || '')} variant="outline">
               {job.status?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'N/A'}
             </Badge>
           </DialogTitle>
