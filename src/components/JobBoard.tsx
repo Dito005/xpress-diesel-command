@@ -139,7 +139,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }: { onJobClick: (job: 
                         </div>
                         
                         <div>
-                          <Progress value={statusStyles.progress} className="h-1" indicatorClassName={statusStyles.progressClass} />
+                                              <Progress value={statusStyles.progress} className="h-1" />
                         </div>
                       </CardContent>
                     </Card>
