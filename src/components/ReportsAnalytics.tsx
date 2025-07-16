@@ -9,10 +9,21 @@ import { TrendingUp, DollarSign, Clock, Users, FileText, Download, Calendar, Ale
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-const fetchReportData = async () => {
-  const invoicesPromise = supabase.from('invoices').select('total, created_at');
-  const jobsPromise = supabase.from('jobs').select('id, job_type, created_at');
-  const timeLogsPromise = supabase.from('time_logs').select('tech_id, clock_in, clock_out, job_id, techs(name, efficiency_by_type)');
+const fetchReportData = async (dateRange: string) => {
+  const getStartDate = (range: string) => {
+    const now = new Date();
+    if (range === '7days') now.setDate(now.getDate() - 7);
+    else if (range === '30days') now.setDate(now.getDate() - 30);
+    else if (range === '90days') now.setDate(now.getDate() - 90);
+    else if (range === '1year') now.setFullYear(now.getFullYear() - 1);
+    else now.setDate(now.getDate() - 7); // Default to 7 days
+    return now.toISOString();
+  };
+  const startDate = getStartDate(dateRange);
+
+  const invoicesPromise = supabase.from('invoices').select('total, created_at').gte('created_at', startDate);
+  const jobsPromise = supabase.from('jobs').select('id, job_type, created_at').gte('created_at', startDate);
+  const timeLogsPromise = supabase.from('time_logs').select('tech_id, clock_in, clock_out, job_id, techs(name, efficiency_by_type)').gte('clock_in', startDate);
 
   const [{ data: invoices, error: invoicesError }, { data: jobs, error: jobsError }, { data: timeLogs, error: timeLogsError }] = await Promise.all([invoicesPromise, jobsPromise, timeLogsPromise]);
 
@@ -28,8 +39,8 @@ export const ReportsAnalytics = () => {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['reportsData'],
-    queryFn: fetchReportData,
+    queryKey: ['reportsData', dateRange],
+    queryFn: () => fetchReportData(dateRange),
   });
 
   useEffect(() => {
@@ -131,13 +142,13 @@ export const ReportsAnalytics = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <FileText className="h-6 w-6" /> Reports & Analytics
         </h2>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="border border-gray-300 rounded-md px-3 py-2 text-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="border border-input rounded-md px-3 py-2 text-sm bg-background">
               <option value="7days">Last 7 Days</option> <option value="30days">Last 30 Days</option>
               <option value="90days">Last 90 Days</option> <option value="1year">Last Year</option>
             </select>
@@ -150,10 +161,10 @@ export const ReportsAnalytics = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpiData.map((kpi, index) => (
-          <Card key={index} className="hover:shadow-lg transition-shadow">
+          <Card key={index} className="hover:shadow-lg transition-shadow border">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <kpi.icon className="h-4 w-4" /> {kpi.title}
                 </CardTitle>
                 <Badge variant={kpi.trend === "up" ? "default" : "destructive"} className="text-xs">{kpi.change}</Badge>
@@ -161,7 +172,7 @@ export const ReportsAnalytics = () => {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</div>
-              <div className="text-xs text-gray-500 mt-1">vs previous period</div>
+              <div className="text-xs text-muted-foreground mt-1">vs previous period</div>
             </CardContent>
           </Card>
         ))}
@@ -174,43 +185,43 @@ export const ReportsAnalytics = () => {
           <TabsTrigger value="insights">AI Insights</TabsTrigger>
         </TabsList>
         <TabsContent value="revenue" className="space-y-4">
-          <Card><CardHeader><CardTitle>Revenue vs Cost Analysis</CardTitle></CardHeader><CardContent>
+          <Card className="border"><CardHeader><CardTitle>Revenue vs Cost Analysis</CardTitle></CardHeader><CardContent>
             <ResponsiveContainer width="100%" height={400}><BarChart data={revenueData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="revenue" fill="#3B82F6" name="Revenue" /><Bar dataKey="cost" fill="#EF4444" name="Cost" /></BarChart></ResponsiveContainer>
           </CardContent></Card>
         </TabsContent>
         <TabsContent value="efficiency" className="space-y-4">
-          <Card><CardHeader><CardTitle>Technician Efficiency Ratings</CardTitle></CardHeader><CardContent>
+          <Card className="border"><CardHeader><CardTitle>Technician Efficiency Ratings</CardTitle></CardHeader><CardContent>
             <ResponsiveContainer width="100%" height={400}><BarChart data={efficiencyData} layout="horizontal"><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} /><YAxis dataKey="name" type="category" width={120} /><Tooltip /><Bar dataKey="efficiency" fill="#10B981" /></BarChart></ResponsiveContainer>
           </CardContent></Card>
         </TabsContent>
         <TabsContent value="jobs" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card><CardHeader><CardTitle>Job Type Distribution</CardTitle></CardHeader><CardContent>
+            <Card className="border"><CardHeader><CardTitle>Job Type Distribution</CardTitle></CardHeader><CardContent>
               <ResponsiveContainer width="100%" height={300}><PieChart><Pie data={jobTypeData} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>{jobTypeData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><Tooltip /></PieChart></ResponsiveContainer>
             </CardContent></Card>
-            <Card><CardHeader><CardTitle>Job Completion Trends</CardTitle></CardHeader><CardContent>
+            <Card className="border"><CardHeader><CardTitle>Job Completion Trends</CardTitle></CardHeader><CardContent>
               <ResponsiveContainer width="100%" height={300}><LineChart data={revenueData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Line type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={2} /></LineChart></ResponsiveContainer>
             </CardContent></Card>
           </div>
         </TabsContent>
         <TabsContent value="trends" className="space-y-4">
-          <Card><CardHeader><CardTitle>Performance Trends Over Time</CardTitle></CardHeader><CardContent>
+          <Card className="border"><CardHeader><CardTitle>Performance Trends Over Time</CardTitle></CardHeader><CardContent>
             <ResponsiveContainer width="100%" height={400}><AreaChart data={performanceTrendsData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis /><Tooltip /><Area type="monotone" dataKey="revenue" stackId="1" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.6} /><Area type="monotone" dataKey="efficiency" stackId="2" stroke="#10B981" fill="#10B981" fillOpacity={0.6} /></AreaChart></ResponsiveContainer>
           </CardContent></Card>
         </TabsContent>
         <TabsContent value="insights" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {predictiveInsights.map((insight, index) => (
-              <Card key={index} className="hover:shadow-lg transition-shadow">
+              <Card key={index} className="hover:shadow-lg transition-shadow border">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-gray-600">{insight.title}</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{insight.title}</CardTitle>
                     <Badge variant={insight.trend === "up" ? "default" : insight.trend === "down" ? "destructive" : "secondary"}>{insight.trend === "up" ? <TrendingUp className="h-3 w-3" /> : insight.trend === "down" ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600 mb-2">{insight.value}</div>
-                  <p className="text-sm text-gray-600">{insight.insight}</p>
+                  <p className="text-sm text-muted-foreground">{insight.insight}</p>
                 </CardContent>
               </Card>
             ))}

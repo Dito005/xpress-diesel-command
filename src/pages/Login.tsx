@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -32,22 +32,26 @@ const Login = () => {
     } else {
       toast({
         title: "Login Successful",
-        description: "You have been logged in.",
+        description: "Welcome back!",
       });
       navigate('/');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">Welcome to Xpress Diesel Repair</CardTitle>
-          <p className="text-center text-muted-foreground">Sign in to your Command Center account</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+      <div className="flex items-center gap-4 mb-8">
+        <img src="/xpress-logo.png" alt="Xpress Diesel Logo" className="h-12 w-12" />
+        <h1 className="text-3xl font-bold text-foreground">Xpress Diesel Repair</h1>
+      </div>
+      <Card className="w-full max-w-md border">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Command Center Login</CardTitle>
+          <CardDescription>Enter your credentials to access the dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -56,9 +60,10 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-input"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -67,6 +72,7 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-input"
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>

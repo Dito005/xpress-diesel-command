@@ -7,13 +7,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/components/SessionProvider";
 
-export const TechnicianDashboard = ({ userRole, onJobClick }) => {
+export const TechnicianDashboard = ({ onJobClick }) => {
   const { toast } = useToast();
   const [technicianJobs, setTechnicianJobs] = useState([]);
   const [currentShiftLog, setCurrentShiftLog] = useState(null);
   const [currentJobLog, setCurrentJobLog] = useState(null);
   const [todaysLogs, setTodaysLogs] = useState([]);
-  const { session } = useSession();
+  const { session, userRole } = useSession();
   const [technicianProfile, setTechnicianProfile] = useState(null);
 
   const fetchTechnicianData = async (techId: string) => {
@@ -197,9 +197,9 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
     <div className="space-y-6">
       {userRole === "tech" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-r from-slate-700 to-slate-800 text-white">
+          <Card className="bg-gradient-to-r from-secondary to-background text-foreground border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-200">Work Status</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Work Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
@@ -217,36 +217,36 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
                 </Button>
               </div>
               {currentShiftLog && (
-                <div className="text-xs text-slate-300 mt-2">
+                <div className="text-xs text-muted-foreground mt-2">
                   Shift started at {new Date(currentShiftLog.clock_in).toLocaleTimeString()}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Clock className="h-4 w-4" />
                 Today's Hours
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{todaysHours}h</div>
-              <div className="text-xs text-gray-500">Efficiency: {averageEfficiency}%</div>
+              <div className="text-2xl font-bold">{todaysHours}h</div>
+              <div className="text-xs text-muted-foreground">Efficiency: {averageEfficiency}%</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" />
                 Jobs Today
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{jobsWorkedOnToday}</div>
-              <div className="text-xs text-gray-500">{jobsCompletedToday} Completed</div>
+              <div className="text-2xl font-bold">{jobsWorkedOnToday}</div>
+              <div className="text-xs text-muted-foreground">{jobsCompletedToday} Completed</div>
             </CardContent>
           </Card>
         </div>
@@ -254,12 +254,12 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+          <h3 className="text-xl font-semibold flex items-center gap-2">
             <Wrench className="h-5 w-5" />
             {userRole === "tech" ? "My Assigned Jobs" : "All Technician Jobs"}
           </h3>
           {userRole === "tech" && (
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            <Badge variant="secondary">
               {technicianJobs.length} Active
             </Badge>
           )}
@@ -271,28 +271,27 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
             return (
               <Card 
                 key={job.id} 
-                className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
+                className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-primary"
                 onClick={() => onJobClick(job)}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                    <CardTitle className="text-lg font-semibold">
                       {job.truck_vin.slice(-6)} - {job.job_type}
                     </CardTitle>
                     <Badge className={getStatusColor(job.status)} variant="outline">
-                      {job.status === "assigned" ? "Assigned" : 
-                       job.status === "in_progress" ? "In Progress" : "Completed"}
+                      {job.status.replace('_', ' ')}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
-                    <div className="font-medium text-gray-900">{job.description}</div>
-                    <div className="text-sm text-gray-600">{job.customer_name}</div>
+                    <div className="font-medium">{job.description}</div>
+                    <div className="text-sm text-muted-foreground">{job.customer_name}</div>
                   </div>
                   
                   <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-muted-foreground">
                       <Clock className="h-4 w-4" />
                       Est. {job.estimated_hours || 0}h
                       {workedHours && ` • Worked: ${workedHours}h`}
@@ -306,7 +305,7 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
                     <div className="flex gap-2 pt-2">
                       <Button 
                         size="sm" 
-                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        className="flex-1"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleClockInOutJob(job.id);
@@ -345,8 +344,8 @@ export const TechnicianDashboard = ({ userRole, onJobClick }) => {
       </div>
 
       {userRole !== "tech" && (
-        <div className="text-center py-8 text-gray-500">
-          <User className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+        <div className="text-center py-8 text-muted-foreground">
+          <User className="h-12 w-12 mx-auto mb-3" />
           <p>Advanced technician management features coming soon...</p>
         </div>
       )}

@@ -3,7 +3,7 @@ import { AdminDashboard } from '@/components/AdminDashboard';
 import { TechnicianDashboard } from '@/components/TechnicianDashboard';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 
-export const DashboardPage = () => {
+export const DashboardPage = ({ onJobClick, onGenerateInvoice }) => {
   const { userRole, isLoading } = useSession();
 
   if (isLoading) {
@@ -12,12 +12,12 @@ export const DashboardPage = () => {
 
   // Admins and managers see the main dashboard
   if (userRole === 'admin' || userRole === 'manager') {
-    return <AdminDashboard />;
+    return <AdminDashboard onJobClick={onJobClick} onGenerateInvoice={onGenerateInvoice} />;
   }
 
   // Techs and road techs see their specific dashboard
   if (userRole === 'tech' || userRole === 'road') {
-    return <TechnicianDashboard />;
+    return <TechnicianDashboard onJobClick={onJobClick} />;
   }
 
   // Fallback for other roles or unassigned users

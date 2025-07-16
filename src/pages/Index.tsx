@@ -71,9 +71,9 @@ const Index = () => {
     const path = location.pathname.split('/')[1];
     switch (path) {
       case 'reports':
-        return 'Reports';
+        return 'Reports & Analytics';
       case 'settings':
-        return 'Settings';
+        return 'Shop Settings';
       default:
         return 'Dashboard';
     }
@@ -99,10 +99,10 @@ const Index = () => {
           </Sheet>
           <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-secondary/40">
           <Suspense fallback={<LoadingSkeleton />}>
             <Routes>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/" element={<DashboardPage onJobClick={handleJobClick} onGenerateInvoice={handleGenerateInvoice} />} />
               <Route path="reports" element={<ReportsAnalytics />} />
               <Route path="settings" element={<ShopSettings />} />
             </Routes>

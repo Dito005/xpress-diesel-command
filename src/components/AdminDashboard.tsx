@@ -37,7 +37,7 @@ const fetchAdminDashboardData = async () => {
   };
 };
 
-export const AdminDashboard = () => {
+export const AdminDashboard = ({ onJobClick, onGenerateInvoice }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['adminDashboardData'],
     queryFn: fetchAdminDashboardData,
@@ -76,10 +76,10 @@ export const AdminDashboard = () => {
             isLoading={isLoading}
           />
         </div>
-        <JobBoard onJobClick={() => {}} onGenerateInvoice={() => {}} />
+        <JobBoard onJobClick={onJobClick} onGenerateInvoice={onGenerateInvoice} />
       </div>
       <div className="lg:w-1/3 flex flex-col space-y-6">
-        <Card className="bg-card/80 backdrop-blur-sm">
+        <Card className="border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Zap className="h-5 w-5 text-yellow-400" />
@@ -99,7 +99,7 @@ export const AdminDashboard = () => {
             </ul>
           </CardContent>
         </Card>
-        <Card className="flex-grow flex flex-col bg-card/80 backdrop-blur-sm">
+        <Card className="flex-grow flex flex-col border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <BrainCircuit className="h-5 w-5 text-primary" />
