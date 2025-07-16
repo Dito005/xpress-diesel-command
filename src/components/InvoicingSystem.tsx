@@ -139,8 +139,12 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
         invoiceDate: new Date(editingInvoice.created_at).toISOString().substring(0, 10),
         actualService: editingInvoice.actual_service,
         paymentMethod: editingInvoice.payment_method,
-        laborEntries: editingInvoice.invoice_labor.map((l: any) => ({ description: l.description, hours: l.hours, rate: l.rate })),
-        partEntries: editingInvoice.invoice_parts.map((p: any) => ({ partId: p.part_id, quantity: p.quantity, unitPrice: p.unit_price, markupPercentage: p.markup_percentage, finalPrice: p.final_price })),
+        laborEntries: Array.isArray(editingInvoice.invoice_labor)
+          ? editingInvoice.invoice_labor.map((l: any) => ({ description: l.description, hours: l.hours, rate: l.rate }))
+          : [],
+        partEntries: Array.isArray(editingInvoice.invoice_parts)
+          ? editingInvoice.invoice_parts.map((p: any) => ({ partId: p.part_id, quantity: p.quantity, unitPrice: p.unit_price, markupPercentage: p.markup_percentage, finalPrice: p.final_price }))
+          : [],
         miscFees: editingInvoice.misc_fees || [],
       });
       setPaymentDetails(prev => ({ ...prev, amount: editingInvoice.grand_total }));
