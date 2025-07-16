@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@/lib/supabase/client"; // Updated import
 import { Loader2 } from "lucide-react";
 
 const costsSchema = z.object({
@@ -22,7 +22,7 @@ const costsSchema = z.object({
 });
 
 const fetchBusinessCosts = async () => {
-  const { data, error } = await supabase.from('business_costs').select('*').limit(1).single();
+  const { data, error } = await createClient().from('business_costs').select('*').limit(1).single();
   if (error && error.code !== 'PGRST116') throw error;
   return data;
 };
@@ -44,7 +44,7 @@ export const BusinessCostsSettings = () => {
   const upsertMutation = useMutation({
     mutationFn: async (values: z.infer<typeof costsSchema>) => {
       const payload = { ...values, id: costs?.id || '00000000-0000-0000-0000-000000000001' };
-      const { error } = await supabase.from('business_costs').upsert(payload, { onConflict: 'id' });
+      const { error } = await createClient().from('business_costs').upsert(payload, { onConflict: 'id' });
       if (error) throw error;
     },
     onSuccess: () => {

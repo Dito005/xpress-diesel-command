@@ -7,7 +7,7 @@ import { Users, Plus, Edit, Star, Clock, Wrench, Phone, Mail, MapPin, Trash2, Lo
 import { useToast } from "@/hooks/use-toast";
 import { TechnicianForm, Technician } from "./TechnicianForm";
 import { TechnicianTimeLogModal } from "./TechnicianTimeLogModal";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@/lib/supabase/client"; // Updated import
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
 const fetchTechnicians = async (): Promise<Technician[]> => {

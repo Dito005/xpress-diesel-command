@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Plus, DollarSign, Trash2, Loader2, Search, Edit, Printer, Mail, CheckCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@/lib/supabase/client"; // Updated import
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "./SessionProvider";
 import { InvoiceTemplate } from "./InvoiceTemplate";

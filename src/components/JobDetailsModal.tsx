@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Clock, DollarSign, User, Truck, FileText, Camera, Save, Play, Pause } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useSession } from "@/components/SessionProvider";
+import { useSession } from "./SessionProvider";
 
 export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) => {
   const { toast } = useToast();

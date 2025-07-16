@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, UploadCloud } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@/lib/supabase/client"; // Updated import
 import { FunctionsHttpError } from "@supabase/supabase-js";
 
 const formSchema = z.object({
