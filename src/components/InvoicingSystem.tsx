@@ -152,7 +152,7 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
   const upsertInvoiceMutation = useMutation({
     mutationFn: async (values: z.infer<typeof invoiceSchema>) => {
       const { jobId, ...rest } = values;
-      const invoicePayload = { ...rest, job_id: jobId, subtotal: totals.subtotal, tax: totals.tax, grand_total: totals.grandTotal, misc_fees: values.miscFees, created_by: session?.user.id };
+      const invoicePayload = { ...rest, job_id: jobId, subtotal: totals.subtotal, tax: totals.tax, grand_total: totals.grandTotal, misc_fees: values.miscFees, created_by: session && session.user ? session.user.id : undefined };
       const { data: savedInvoice, error } = values.id ? await supabase.from('invoices').update(invoicePayload).eq('id', values.id).select().single() : await supabase.from('invoices').insert(invoicePayload).select().single();
       if (error) throw error;
       await supabase.from('invoice_labor').delete().eq('invoice_id', savedInvoice.id);
