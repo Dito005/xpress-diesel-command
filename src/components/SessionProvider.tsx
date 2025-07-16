@@ -6,6 +6,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type UserRole = "admin" | "manager" | "tech" | "road" | "parts" | "unassigned";
 
+function isUserRole(role: string | null): role is UserRole {
+  if (role === null) return false;
+  const validRoles: UserRole[] = ["admin", "manager", "tech", "road", "parts", "unassigned"];
+  return (validRoles as string[]).includes(role.toLowerCase());
+}
+
 interface SessionContextType {
   session: Session | null;
   isLoading: boolean;
@@ -20,39 +26,68 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
   const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
-    const getSession = async () => {
+    let isMounted = true;
+
+    const fetchUserRole = async (userId: string) => {
+      if (!isMounted) return;
+      
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        
-        // For now, set a default role to get the app working
-        // You can modify this logic later when your database is set up
-        if (session) {
-          setUserRole('admin'); // Default to admin for testing
+        const { data: techDataArray, error: techError } = await supabase
+          .from('techs')
+          .select('role')
+          .eq('id', userId)
+          .limit(1);
+
+        if (techError) {
+          console.error("Error fetching user role:", techError);
+          setUserRole('unassigned');
+          return;
+        }
+
+        if (techDataArray && techDataArray.length > 0) {
+          const role = techDataArray[0].role;
+          if (isUserRole(role)) {
+            setUserRole(role.toLowerCase() as UserRole);
+          } else {
+            setUserRole('unassigned');
+            console.warn(`Invalid role: ${role}`);
+          }
         } else {
-          setUserRole(null);
+          setUserRole('unassigned');
         }
       } catch (error) {
-        console.error("Error getting session:", error);
-        setSession(null);
-        setUserRole(null);
-      } finally {
-        setIsLoading(false);
+        console.error("Error in fetchUserRole:", error);
+        setUserRole('unassigned');
       }
     };
 
-    getSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      if (newSession) {
-        setUserRole('admin'); // Default to admin for testing
+    const setAuthData = async (session: Session | null) => {
+      if (!isMounted) return;
+      
+      setIsLoading(true);
+      setSession(session);
+      
+      if (session) {
+        await fetchUserRole(session.user.id);
       } else {
         setUserRole(null);
       }
+      
+      setIsLoading(false);
+    };
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (isMounted) setAuthData(session);
+    });
+
+    // Auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isMounted) setAuthData(session);
     });
 
     return () => {
+      isMounted = false;
       subscription?.unsubscribe();
     };
   }, []);

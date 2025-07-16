@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, UploadCloud } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
@@ -76,56 +76,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
     fetchTechs();
   }, []);
 
-  const handleVinLookup = async () => {
-    const vin = form.getValues("truckVin");
-    if (!vin || vin.length !== 17) {
-      toast({ variant: "destructive", title: "Invalid VIN", description: "Please enter a valid 17-character VIN to look up." });
-      return;
-    }
-    setIsVinLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('vin-lookup', {
-        body: { vin },
-      });
-      if (error) throw error;
-
-      form.setValue("make", data.make);
-      form.setValue("model", data.model);
-      form.setValue("year", data.year);
-      toast({ title: "Vehicle Found", description: `${data.year} ${data.make} ${data.model} details filled in.` });
-    } catch (error: any) {
-      const errorMessage = error instanceof FunctionsHttpError ? await error.context.json() : { error: error.message };
-      toast({ variant: "destructive", title: "VIN Lookup Failed", description: errorMessage.error });
-    } finally {
-      setIsVinLoading(false);
-    }
-  };
-
-  const handleUsdotLookup = async () => {
-    const usdot = form.getValues("usdotNumber");
-    if (!usdot) {
-      toast({ variant: "destructive", title: "Missing USDOT", description: "Please enter a USDOT number to look up." });
-      return;
-    }
-    setIsUsdotLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('usdot-lookup', {
-        body: { usdot },
-      });
-      if (error) throw error;
-
-      form.setValue("company", data.companyName);
-      form.setValue("customerPhone", data.companyPhone);
-      form.setValue("billingAddress", data.companyAddress);
-      toast({ title: "Company Found", description: `${data.companyName} details have been filled in.` });
-    } catch (error: any) {
-      const errorMessage = error instanceof FunctionsHttpError ? await error.context.json() : { error: error.message };
-      toast({ variant: "destructive", title: "USDOT Lookup Failed", description: errorMessage.error });
-    } finally {
-      setIsUsdotLoading(false);
-    }
-  };
-
   const handleImageScan = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -158,12 +108,10 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
       if (vinMatch?.[1]) {
         form.setValue("truckVin", vinMatch[1].toUpperCase());
         toast({ title: "VIN Found!", description: `Populated VIN: ${vinMatch[1].toUpperCase()}` });
-        handleVinLookup();
       }
       if (usdotMatch?.[1]) {
         form.setValue("usdotNumber", usdotMatch[1]);
         toast({ title: "USDOT Found!", description: `Populated USDOT: ${usdotMatch[1]}` });
-        handleUsdotLookup();
       }
 
       if (!vinMatch && !usdotMatch) {
@@ -181,28 +129,9 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
     setIsSubmitting(true);
     const { assignedTechId, estimatedHours, ...jobData } = values;
   
-    const payload = {
-      customer_name: jobData.customerName,
-      customer_email: jobData.customerEmail,
-      customer_phone: jobData.customerPhone,
-      company: jobData.company,
-      truck_vin: jobData.truckVin,
-      job_type: jobData.jobType,
-      priority: jobData.priority,
-      status: 'open',
-      notes: jobData.notes,
-      customer_concern: jobData.customerConcern,
-      recommended_service: jobData.recommendedService,
-      billing_address: jobData.billingAddress,
-      estimated_hours: estimatedHours,
-      make: jobData.make,
-      model: jobData.model,
-      year: jobData.year,
-    };
-
     const { data: newJob, error } = await supabase
       .from('jobs')
-      .insert(payload)
+      .insert({ ...jobData, estimated_hours: estimatedHours })
       .select('id')
       .single();
   
@@ -249,7 +178,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
                   <FormControl>
                     <Input placeholder="Enter 17-character VIN" {...field} />
                   </FormControl>
-                  <Button type="button" onClick={handleVinLookup} disabled={isVinLoading}>
+                  <Button type="button" onClick={() => {}} disabled={isVinLoading}>
                     {isVinLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -257,11 +186,6 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
               </FormItem>
             )}
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <FormField control={form.control} name="make" render={({ field }) => (<FormItem><FormLabel>Make</FormLabel><FormControl><Input placeholder="e.g., Freightliner" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="model" render={({ field }) => (<FormItem><FormLabel>Model</FormLabel><FormControl><Input placeholder="e.g., Cascadia" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="year" render={({ field }) => (<FormItem><FormLabel>Year</FormLabel><FormControl><Input placeholder="e.g., 2022" {...field} /></FormControl><FormMessage /></FormItem>)} />
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField control={form.control} name="jobType" render={({ field }) => (<FormItem><FormLabel>Job Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select job type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Diagnostics">Diagnostics</SelectItem><SelectItem value="Repair">Repair</SelectItem><SelectItem value="Maintenance">Maintenance</SelectItem><SelectItem value="Road Service">Road Service</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="priority" render={({ field }) => (<FormItem><FormLabel>Priority</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select priority" /></SelectTrigger></FormControl><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
@@ -272,7 +196,7 @@ export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
         
         <div className="space-y-4 p-4 border rounded-lg bg-secondary/50">
           <h3 className="font-semibold text-lg">Customer Information</h3>
-          <FormField control={form.control} name="usdotNumber" render={({ field }) => (<FormItem><FormLabel>USDOT Number</FormLabel><div className="flex gap-2"><FormControl><Input placeholder="Enter USDOT number" {...field} /></FormControl><Button type="button" onClick={handleUsdotLookup} disabled={isUsdotLoading}>{isUsdotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button></div><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="usdotNumber" render={({ field }) => (<FormItem><FormLabel>USDOT Number</FormLabel><div className="flex gap-2"><FormControl><Input placeholder="Enter USDOT number" {...field} /></FormControl><Button type="button" onClick={() => {}} disabled={isUsdotLoading}>{isUsdotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button></div><FormMessage /></FormItem>)} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField control={form.control} name="customerName" render={({ field }) => (<FormItem><FormLabel>Customer Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="company" render={({ field }) => (<FormItem><FormLabel>Company</FormLabel><FormControl><Input placeholder="e.g., Acme Trucking" {...field} /></FormControl><FormMessage /></FormItem>)} />

@@ -1,32 +1,42 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { SessionProvider } from "@/components/SessionProvider";
+import { SessionProvider, useSession } from "@/components/SessionProvider";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { LoadingSkeleton } from "./components/LoadingSkeleton";
 
 const queryClient = new QueryClient();
+
+const AppRoutes = () => {
+  const { session, isLoading } = useSession();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+      <Route path="/*" element={session ? <Index /> : <Navigate to="/login" />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
         <BrowserRouter>
-          <ErrorBoundary>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route element={<ProtectedRoute />}>
-                <Route path="/*" element={<Index />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <Toaster />
-          </ErrorBoundary>
+          <AppRoutes />
         </BrowserRouter>
+        <Toaster />
       </SessionProvider>
     </QueryClientProvider>
   );

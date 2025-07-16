@@ -18,9 +18,6 @@ const fetchJobs = async () => {
       status,
       job_type,
       customer_name,
-      make,
-      model,
-      year,
       job_assignments(techs(name))
     `);
   
@@ -120,7 +117,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                          {job.year || ''} {job.make || 'Unit'} {job.truck_vin?.slice(-6)}
+                          {job.truck_vin.slice(-6)}
                         </CardTitle>
                         <Badge variant="outline" className="text-xs">
                           {getStatusText(job.status)}

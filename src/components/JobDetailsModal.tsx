@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Clock, DollarSign, User, Truck, FileText, Camera, Save, Play, Pause } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/components/SessionProvider";
 
 export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) => {
@@ -149,7 +149,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Truck className="h-6 w-6 text-primary" />
-            Job Details - {job.year} {job.make} {job.model} ({job.truck_vin?.slice(-6) || 'N/A'})
+            Job Details - {job.truck_vin?.slice(-6) || 'N/A'}
             <Badge className={getStatusColor(job.status)} variant="outline">
               {job.status?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}
             </Badge>
@@ -175,22 +175,6 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Job Type</Label>
                     <div className="font-semibold">{job.job_type || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Make</Label>
-                    <div className="font-semibold">{job.make || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Model</Label>
-                    <div className="font-semibold">{job.model || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Year</Label>
-                    <div className="font-semibold">{job.year || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Full VIN</Label>
-                    <div className="font-semibold text-xs">{job.truck_vin || 'N/A'}</div>
                   </div>
                 </div>
                 
