@@ -152,13 +152,16 @@ export const InvoicingSystem = ({ isOpen, setIsOpen, editingInvoice, onSuccess, 
   const upsertInvoiceMutation = useMutation({
     mutationFn: async (values: z.infer<typeof invoiceSchema>) => {
       const { jobId, ...rest } = values;
-      const invoicePayload = { ...rest, job_id: jobId, subtotal: totals.subtotal, tax: totals.tax, grand_total: totals.grandTotal, misc_fees: values.miscFees, created_by: session && session.user ? session.user.id : undefined };
+      const createdBy = session && session.user ? session.user.id : undefined;
+      const invoicePayload = { ...rest, job_id: jobId, subtotal: totals.subtotal, tax: totals.tax, grand_total: totals.grandTotal, misc_fees: values.miscFees, created_by: createdBy };
       const { data: savedInvoice, error } = values.id ? await supabase.from('invoices').update(invoicePayload).eq('id', values.id).select().single() : await supabase.from('invoices').insert(invoicePayload).select().single();
       if (error) throw error;
       await supabase.from('invoice_labor').delete().eq('invoice_id', savedInvoice.id);
       await supabase.from('invoice_parts').delete().eq('invoice_id', savedInvoice.id);
       if (values.laborEntries.length > 0) await supabase.from('invoice_labor').insert(values.laborEntries.map(l => ({ ...l, invoice_id: savedInvoice.id })));
-      if (values.partEntries.length > 0) await supabase.from('invoice_parts').insert(values.partEntries.map(p => ({ ...p, invoice_id: savedInvoice.id })));
+      if (values.partEntries && values.partEntries.length > 0) {
+        await supabase.from('invoice_parts').insert(values.partEntries.map(p => ({ ...p, invoice_id: savedInvoice.id })));
+      }
       return savedInvoice;
     },
     onSuccess: (data) => {
