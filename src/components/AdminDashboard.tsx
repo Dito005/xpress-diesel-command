@@ -41,7 +41,7 @@ export const AdminDashboard = ({ userRole }: { userRole: string }) => {
     queryFn: fetchAdminDashboardData,
   });
 
-  const handleJobClick = (job) => {
+  const handleJobClick = (job: any) => {
     setSelectedJob(job);
   };
 
