@@ -15,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { JobDetailsModal } from "@/components/JobDetailsModal";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
-import { FloatingAIHelper } from "@/components/FloatingAIHelper";
 import React from "react";
 
 const DashboardPage = React.lazy(() => import('./DashboardPage').then(module => ({ default: module.DashboardPage })));
@@ -90,7 +89,7 @@ const Index = () => {
   const { toast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false);
+  const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(null); // Changed to null for consistency
   const [editingInvoice, setEditingInvoice] = useState(null);
 
   useEffect(() => {
@@ -173,7 +172,6 @@ const Index = () => {
           </Suspense>
         </main>
       </div>
-      <FloatingAIHelper />
       {selectedJob && (
         <JobDetailsModal
           job={selectedJob}
