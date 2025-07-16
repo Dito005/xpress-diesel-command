@@ -1,7 +1,11 @@
 "use client";
 
-import { Toaster as ToasterPrimitive } from "@/components/ui/toast"
+import { ToastProvider, ToastViewport } from "@/components/ui/toast";
 
 export function Toaster() {
-  return <ToasterPrimitive />
+  return (
+    <ToastProvider>
+      <ToastViewport />
+    </ToastProvider>
+  );
 }
