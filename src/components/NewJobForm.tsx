@@ -39,6 +39,7 @@ interface NewJobFormProps {
 
 export const NewJobForm = ({ onSuccess }: NewJobFormProps) => {
   const { toast } = useToast();
+  const supabase = createClient();
   const [isVinLoading, setIsVinLoading] = useState(false);
   const [isUsdotLoading, setIsUsdotLoading] = useState(false);
   const [isOcrLoading, setIsOcrLoading] = useState(false);

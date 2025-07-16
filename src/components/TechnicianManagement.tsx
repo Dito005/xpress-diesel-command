@@ -10,6 +10,8 @@ import { TechnicianTimeLogModal } from "./TechnicianTimeLogModal";
 import { createClient } from "@/lib/supabase/client"; // Updated import
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
+const supabase = createClient();
+
 const fetchTechnicians = async (): Promise<Technician[]> => {
   const { data, error } = await supabase.from('techs').select('*');
   if (error) throw error;

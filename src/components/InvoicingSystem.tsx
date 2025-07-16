@@ -47,6 +47,8 @@ const invoiceSchema = z.object({
   grandTotal: z.number().min(0.01, "Grand Total must be greater than zero."),
 });
 
+const supabase = createClient();
+
 const fetchInvoicingData = async () => {
   const [invPromise, jobPromise, partPromise, techPromise, settingsPromise] = [
     supabase.from('invoices').select('*, jobs(*), invoice_parts(*, parts(*)), invoice_labor(*), payments(*)').order('created_at', { ascending: false }),

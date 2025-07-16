@@ -6,18 +6,47 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Clock, DollarSign, User, Truck, FileText, Camera, Save, Play, Pause } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "./SessionProvider";
 
-export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) => {
+interface JobDetailsModalProps {
+  job: {
+    id: string;
+    notes?: string;
+    actual_service?: string;
+    status?: string;
+    estimated_hours?: number;
+    truck_vin?: string;
+    job_type?: string;
+    customer_name?: string;
+    customer_concern?: string;
+    estimatedRevenue?: number;
+    actualCost?: number;
+    profitMargin?: number;
+    [key: string]: any;
+  } | null;
+  onClose: () => void;
+  userRole: string;
+  onGenerateInvoice: (job: any) => void;
+}
+
+interface TimeLog {
+  id: string;
+  clock_in?: string;
+  clock_out?: string;
+  [key: string]: any;
+}
+
+export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }: JobDetailsModalProps) => {
   const { toast } = useToast();
+  const supabase = createClient();
   const [notes, setNotes] = useState(job?.notes || "");
   const [actualService, setActualService] = useState(job?.actual_service || "");
   const [jobStatus, setJobStatus] = useState(job?.status || "open");
-  const [currentJobTimeLog, setCurrentJobTimeLog] = useState(null);
+  const [currentJobTimeLog, setCurrentJobTimeLog] = useState<TimeLog | null>(null);
   const { session } = useSession();
-  const [currentTechId, setCurrentTechId] = useState(null);
+  const [currentTechId, setCurrentTechId] = useState<string | null>(null);
   const [assignedTechNames, setAssignedTechNames] = useState('');
   const [timeTracking, setTimeTracking] = useState({ estimated: 0, actual: 0 });
 
@@ -72,7 +101,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
 
   if (!job) return null;
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch(status) {
       case "open": return "bg-gray-100 text-gray-800 border-gray-300";
       case "in_progress": return "bg-blue-100 text-blue-800 border-blue-300";
@@ -83,7 +112,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
     }
   };
 
-  const getProfitColor = (margin) => {
+  const getProfitColor = (margin: number) => {
     if (margin >= 80) return "text-green-500";
     if (margin >= 60) return "text-yellow-500";
     return "text-red-500";
@@ -151,7 +180,7 @@ export const JobDetailsModal = ({ job, onClose, userRole, onGenerateInvoice }) =
             <Truck className="h-6 w-6 text-primary" />
             Job Details - {job.truck_vin?.slice(-6) || 'N/A'}
             <Badge className={getStatusColor(job.status)} variant="outline">
-              {job.status?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}
+              {job.status?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'N/A'}
             </Badge>
           </DialogTitle>
         </DialogHeader>

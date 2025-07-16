@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bot, Send, Loader2, User } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "./SessionProvider";
 import {
@@ -33,6 +33,7 @@ interface AIAction {
 export const AIHelper = () => {
   const { toast } = useToast();
   const { session } = useSession();
+  const supabase = createClient();
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, type: "ai", content: "Hi! I'm your AI assistant. How can I help you manage the shop today? Try asking me to 'create a job'." }
   ]);

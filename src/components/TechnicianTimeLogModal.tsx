@@ -16,6 +16,7 @@ interface TimeLog {
   clock_out: string | null;
   notes: string | null;
   jobs?: { job_type: string; truck_vin: string | null } | null;
+  [key: string]: any;
 }
 
 interface Technician {
@@ -26,6 +27,7 @@ interface Technician {
 
 export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen: boolean; onClose: () => void; technician: Technician }) => {
   const { toast } = useToast();
+  const supabase = createClient();
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newLog, setNewLog] = useState({ jobId: '', clockIn: '', clockOut: '', notes: '' });
@@ -40,7 +42,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
   }, [isOpen, technician?.id]);
 
   const fetchTimeLogs = async () => {
-    const { data, error } = await createClient
+    const { data, error } = await supabase
       .from('time_logs')
       .select(`*, jobs(job_type, truck_vin)`)
       .eq('tech_id', technician.id)
@@ -54,14 +56,14 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
   };
 
   const fetchJobs = async () => {
-    const { data, error } = await createClient.from('jobs').select('id, job_type, truck_vin');
+    const { data, error } = await supabase.from('jobs').select('id, job_type, truck_vin');
     if (error) console.error("Error fetching jobs:", error);
     else setJobs(data);
   };
 
   const handleSaveEdit = async () => {
     if (!editingLog) return;
-    const { error } = await createClient
+    const { error } = await supabase
       .from('time_logs')
       .update({
         clock_in: new Date(editingLog.clock_in).toISOString(),
@@ -84,7 +86,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
       toast({ variant: "destructive", title: "Missing Info", description: "Clock In time is required." });
       return;
     }
-    const { error } = await createClient.from('time_logs').insert({
+    const { error } = await supabase.from('time_logs').insert({
       tech_id: technician.id,
       job_id: newLog.jobId || null,
       clock_in: new Date(newLog.clockIn).toISOString(),
@@ -103,7 +105,7 @@ export const TechnicianTimeLogModal = ({ isOpen, onClose, technician }: { isOpen
 
   const handleDeleteLog = async (logId: string) => {
     if (window.confirm("Are you sure you want to delete this time log?")) {
-      const { error } = await createClient.from('time_logs').delete().eq('id', logId);
+      const { error } = await supabase.from('time_logs').delete().eq('id', logId);
       if (error) {
         toast({ variant: "destructive", title: "Error deleting log", description: error.message });
       } else {
