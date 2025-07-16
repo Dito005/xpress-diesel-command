@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { TrendingUp, DollarSign, Clock, Users, FileText, Download, Calendar, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const fetchReportData = async (dateRange: string) => {
+  const supabase = createClient();
   const getStartDate = (range: string) => {
     const now = new Date();
     if (range === '7days') now.setDate(now.getDate() - 7);
@@ -37,6 +40,7 @@ const fetchReportData = async (dateRange: string) => {
 export const ReportsAnalytics = () => {
   const [dateRange, setDateRange] = useState("7days");
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['reportsData', dateRange],
@@ -54,7 +58,7 @@ export const ReportsAnalytics = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, supabase]);
 
   const { kpiData, revenueData, efficiencyData, jobTypeData } = useMemo(() => {
     if (!data) return { kpiData: [], revenueData: [], efficiencyData: [], jobTypeData: [] };

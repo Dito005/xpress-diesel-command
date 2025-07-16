@@ -1,65 +1,63 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, BarChart2, Settings, LogOut } from "lucide-react";
-import type { UserRole } from "./SessionProvider";
+"use client";
 
-const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "tech", "road", "parts", "unassigned"] },
-  { href: "/reports", label: "Reports", icon: BarChart2, roles: ["admin", "manager"] },
-  { href: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, BarChart3, Settings, LogOut, User, Wrench } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+
+const adminNavItems = [
+  { href: "/", label: "Dashboard", icon: Home },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-interface SidebarProps {
-  userRole: UserRole;
-  onLinkClick?: () => void;
-}
+const techNavItems = [
+  { href: "/", label: "My Dashboard", icon: Wrench },
+  { href: "/profile", label: "My Profile", icon: User },
+];
 
-export const Sidebar = ({ userRole, onLinkClick }: SidebarProps) => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
+export const Sidebar = ({ userRole, onLinkClick }: { userRole: string, onLinkClick?: () => void }) => {
+  const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast({ variant: "destructive", title: "Logout failed", description: error.message });
-    } else {
-      navigate('/login');
-    }
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
   };
 
-  const filteredNavItems = navItems.filter(item => userRole && item.roles.includes(userRole));
+  const navItems = userRole === 'admin' || userRole === 'manager' ? adminNavItems : techNavItems;
 
   return (
-    <div className="flex flex-col h-full bg-card text-card-foreground border-r">
-      <div className="p-4 border-b flex items-center gap-2">
-        <img src="/xpress-logo.png" alt="Xpress Diesel Logo" className="h-8 w-8" />
-        <h1 className="text-xl font-bold text-primary">Xpress Diesel</h1>
+    <div className="flex h-full max-h-screen flex-col gap-2 bg-card text-card-foreground">
+      <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <img src="/xpress-logo.png" alt="Xpress Diesel Logo" className="h-8 w-8" />
+          <span className="">Xpress Diesel</span>
+        </Link>
       </div>
-      <nav className="flex-1 p-4 space-y-2">
-        {filteredNavItems.map((item) => (
-          <NavLink
-            key={item.href}
-            to={item.href}
-            end={item.href === "/"}
-            onClick={onLinkClick}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-                isActive && "bg-accent text-primary"
-              )
-            }
-          >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="p-4 border-t mt-auto">
+      <div className="flex-1">
+        <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
+          {navItems.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={onLinkClick}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary ${
+                pathname === item.href ? "bg-muted text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      <div className="mt-auto p-4">
         <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
+          <LogOut className="mr-2 h-4 w-4" />
           Logout
         </Button>
       </div>

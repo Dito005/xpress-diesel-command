@@ -1,26 +1,32 @@
-import { useSession } from '@/components/SessionProvider';
+import { createClient } from '@/lib/supabase/server';
 import { AdminDashboard } from '@/components/AdminDashboard';
 import { TechnicianDashboard } from '@/components/TechnicianDashboard';
-import { LoadingSkeleton } from '@/components/LoadingSkeleton';
+import { redirect } from 'next/navigation';
 
-export const DashboardPage = ({ onJobClick, onGenerateInvoice }) => {
-  const { userRole, isLoading } = useSession();
+export default async function DashboardPage() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><LoadingSkeleton /></div>;
+  if (!user) {
+    return redirect('/login');
   }
 
-  // Admins and managers see the main dashboard
+  const { data: techProfile } = await supabase
+    .from('techs')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+  
+  const userRole = techProfile?.role || 'unassigned';
+
   if (userRole === 'admin' || userRole === 'manager') {
-    return <AdminDashboard onJobClick={onJobClick} onGenerateInvoice={onGenerateInvoice} />;
+    return <AdminDashboard userRole={userRole} />;
   }
 
-  // Techs and road techs see their specific dashboard
   if (userRole === 'tech' || userRole === 'road') {
-    return <TechnicianDashboard onJobClick={onJobClick} />;
+    return <TechnicianDashboard userRole={userRole} />;
   }
 
-  // Fallback for other roles or unassigned users
   return (
     <div className="flex items-center justify-center h-full">
       <div className="text-center">
@@ -34,4 +40,4 @@ export const DashboardPage = ({ onJobClick, onGenerateInvoice }) => {
       </div>
     </div>
   );
-};
+}
