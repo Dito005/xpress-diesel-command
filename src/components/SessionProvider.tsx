@@ -20,74 +20,75 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
+const fetchUserRole = async (userId: string): Promise<UserRole> => {
+  try {
+    const { data, error } = await supabase
+      .from('techs')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.warn(`No tech profile found for user ${userId}. Defaulting to 'unassigned'.`);
+        return 'unassigned';
+      }
+      console.error("Error fetching user role:", error.message);
+      return 'unassigned';
+    }
+
+    if (data && isUserRole(data.role)) {
+      return data.role.toLowerCase() as UserRole;
+    }
+    
+    console.warn(`Invalid or no role found for user ${userId}, setting to 'unassigned'.`);
+    return 'unassigned';
+  } catch (error) {
+    console.error("Exception fetching user role:", error);
+    return 'unassigned';
+  }
+};
+
 export const SessionProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchUserRole = async (userId: string) => {
-      if (!isMounted) return;
-      
+    const getSessionAndRole = async () => {
       try {
-        const { data: techDataArray, error: techError } = await supabase
-          .from('techs')
-          .select('role')
-          .eq('id', userId)
-          .limit(1);
-
-        if (techError) {
-          console.error("Error fetching user role:", techError);
-          setUserRole('unassigned');
-          return;
-        }
-
-        if (techDataArray && techDataArray.length > 0) {
-          const role = techDataArray[0].role;
-          if (isUserRole(role)) {
-            setUserRole(role.toLowerCase() as UserRole);
-          } else {
-            setUserRole('unassigned');
-            console.warn(`Invalid role: ${role}`);
-          }
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        if (session) {
+          const role = await fetchUserRole(session.user.id);
+          setUserRole(role);
         } else {
-          setUserRole('unassigned');
+          setUserRole(null);
         }
       } catch (error) {
-        console.error("Error in fetchUserRole:", error);
-        setUserRole('unassigned');
+        console.error("Error during initial session load:", error);
+        setSession(null);
+        setUserRole(null);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    const setAuthData = async (session: Session | null) => {
-      if (!isMounted) return;
-      
+    getSessionAndRole();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setIsLoading(true);
-      setSession(session);
-      
-      if (session) {
-        await fetchUserRole(session.user.id);
+      setSession(newSession);
+      if (newSession) {
+        const role = await fetchUserRole(newSession.user.id);
+        setUserRole(role);
       } else {
         setUserRole(null);
       }
-      
       setIsLoading(false);
-    };
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (isMounted) setAuthData(session);
-    });
-
-    // Auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMounted) setAuthData(session);
     });
 
     return () => {
-      isMounted = false;
       subscription?.unsubscribe();
     };
   }, []);

@@ -165,14 +165,7 @@ const Index = () => {
           <Suspense fallback={<LoadingSkeleton />}>
             <Routes>
               <Route path="/" element={
-                <DashboardPage 
-                  onJobClick={handleJobClick} 
-                  onGenerateInvoice={handleGenerateInvoice}
-                  onOpenInvoiceEditor={handleOpenInvoiceEditor}
-                  isInvoiceEditorOpen={isInvoiceEditorOpen}
-                  setIsInvoiceEditorOpen={setIsInvoiceEditorOpen}
-                  editingInvoice={editingInvoice}
-                />
+                <DashboardPage />
               } />
               <Route path="reports" element={<ReportsAnalytics />} />
               <Route path="settings" element={<ShopSettings />} />
