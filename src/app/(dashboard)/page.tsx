@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   }
 
   if (userRole === 'tech' || userRole === 'road') {
-    return <TechnicianDashboard userRole={userRole} />;
+    return <TechnicianDashboard userRole={userRole} userId={user.id} />;
   }
 
   return (

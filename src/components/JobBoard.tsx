@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { User, Plus, Loader2 } from "lucide-react";
 import { NewJobForm } from "./NewJobForm";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { Progress } from "@/components/ui/progress";
 
 const fetchJobs = async () => {
+  const supabase = createClient();
   const { data, error } = await supabase
     .from('jobs')
     .select(`
@@ -29,9 +32,10 @@ const fetchJobs = async () => {
   }));
 };
 
-export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
+export const JobBoard = ({ onJobClick, onGenerateInvoice }: { onJobClick: (job: any) => void; onGenerateInvoice: (job: any) => void; }) => {
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ['jobs'],
@@ -48,7 +52,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, supabase]);
 
   const jobsByStatus = useMemo(() => ({
     open: jobs.filter(job => job.status === "open"),
@@ -57,7 +61,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
     completed: jobs.filter(job => job.status === "completed")
   }), [jobs]);
 
-  const getStatusStyles = (status) => {
+  const getStatusStyles = (status: string) => {
     switch(status) {
       case "open": return { border: "border-gray-500", progress: 10, progressClass: "bg-gray-400" };
       case "in_progress": return { border: "border-blue-500", progress: 50, progressClass: "bg-blue-500" };
@@ -67,7 +71,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
@@ -108,7 +112,7 @@ export const JobBoard = ({ onJobClick, onGenerateInvoice }) => {
               </div>
               
               <div className="space-y-3 h-full">
-                {statusJobs.map((job) => {
+                {statusJobs.map((job: any) => {
                   const statusStyles = getStatusStyles(job.status);
                   return (
                     <Card 
