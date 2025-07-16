@@ -5,14 +5,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Initialize Electron context safely
-      window.electronAPI = window.electronAPI || {
-        send: () => {},
-        on: () => {},
-        removeListener: () => {}
-      };
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
