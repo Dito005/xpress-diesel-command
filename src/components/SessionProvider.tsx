@@ -20,108 +20,70 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
+const fetchUserRole = async (userId: string): Promise<UserRole> => {
+  try {
+    const { data, error } = await supabase
+      .from('techs')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching user role:", error.message);
+      return 'unassigned';
+    }
+
+    if (data && isUserRole(data.role)) {
+      return data.role.toLowerCase() as UserRole;
+    }
+    
+    console.warn(`Invalid or no role found for user ${userId}, setting to 'unassigned'.`);
+    return 'unassigned';
+  } catch (error) {
+    console.error("Exception fetching user role:", error);
+    return 'unassigned';
+  }
+};
+
 export const SessionProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchUserRole = async (userId: string) => {
-      console.log("SessionProvider: Inside fetchUserRole for userId:", userId);
-      if (!isMounted) {
-        console.log("SessionProvider: fetchUserRole unmounted, returning.");
-        return;
-      }
-      
+    const getSessionAndRole = async () => {
       try {
-        const { data: techDataArray, error: techError } = await supabase
-          .from('techs')
-          .select('role')
-          .eq('id', userId)
-          .limit(1);
-
-        if (techError) {
-          console.error("SessionProvider: Error fetching user role from 'techs' table:", techError);
-          if (isMounted) setUserRole('unassigned');
-          return;
-        }
-
-        if (isMounted) {
-          if (techDataArray && techDataArray.length > 0) {
-            const role = techDataArray[0].role;
-            if (isUserRole(role)) {
-              setUserRole(role.toLowerCase() as UserRole);
-              console.log("SessionProvider: User role set to:", role.toLowerCase());
-            } else {
-              setUserRole('unassigned');
-              console.warn(`SessionProvider: Invalid role received: ${role}. Setting to 'unassigned'.`);
-            }
-          } else {
-            setUserRole('unassigned');
-            console.log("SessionProvider: No tech profile found, user role set to 'unassigned'.");
-          }
-        }
-      } catch (error) {
-        console.error("SessionProvider: Error in fetchUserRole (catch block):", error);
-        if (isMounted) setUserRole('unassigned');
-      }
-    };
-
-    const initializeSession = async () => {
-      console.log("SessionProvider: Initializing session...");
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("SessionProvider: Error getting session:", error);
-          throw error;
-        }
-
-        if (isMounted) {
-          setSession(session);
-          console.log("SessionProvider: Session obtained:", session ? "present" : "null");
-          if (session) {
-            console.log("SessionProvider: Fetching user role for user ID:", session.user.id);
-            await fetchUserRole(session.user.id);
-            console.log("SessionProvider: User role fetched.");
-          } else {
-            setUserRole(null);
-            console.log("SessionProvider: No session, user role set to null.");
-          }
-        }
-      } catch (error) {
-        console.error("SessionProvider: Failed to initialize session (catch block):", error);
-        if (isMounted) {
-          setSession(null);
-          setUserRole(null);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-          console.log("SessionProvider: Loading finished. IsLoading set to false.");
-        }
-      }
-    };
-
-    initializeSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      console.log("SessionProvider: Auth state changed. Event:", _event, "New session:", newSession ? "present" : "null");
-      if (isMounted) {
-        setSession(newSession);
-        if (newSession) {
-          await fetchUserRole(newSession.user.id);
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        if (session) {
+          const role = await fetchUserRole(session.user.id);
+          setUserRole(role);
         } else {
           setUserRole(null);
         }
+      } catch (error) {
+        console.error("Error during initial session load:", error);
+        setSession(null);
+        setUserRole(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    getSessionAndRole();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession);
+      if (newSession) {
+        const role = await fetchUserRole(newSession.user.id);
+        setUserRole(role);
+      } else {
+        setUserRole(null);
       }
     });
 
     return () => {
-      isMounted = false;
       subscription?.unsubscribe();
-      console.log("SessionProvider: Component unmounted, subscription unsubscribed.");
     };
   }, []);
 
